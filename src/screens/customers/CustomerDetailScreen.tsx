@@ -1,0 +1,1 @@
+export { CustomerDetailScreen } from '../PlaceholderScreens'
