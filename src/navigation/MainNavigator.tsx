@@ -9,7 +9,7 @@ import { ProductsStack } from './stacks/ProductsStack'
 import { OrdersStack } from './stacks/OrdersStack'
 import { SettingsStack } from './stacks/SettingsStack'
 import { ProductFormScreen } from '../screens/products/ProductFormScreen'
-import { ProductListScreen } from '../screens/products/ProductListScreen'
+import { ProductListScreen } from '../screens/products/ProductListScreenComplete'
 import { OrderFormScreen } from '../screens/orders/OrderFormScreen'
 import { PurchaseOrderListScreen } from '../screens/orders/PurchaseOrderListScreen'
 import { SalesOrderListScreen } from '../screens/orders/SalesOrderListScreen'
@@ -17,7 +17,16 @@ import { BrandManagementScreen } from '../screens/settings/BrandManagementScreen
 import { CategoryManagementScreen } from '../screens/settings/CategoryManagementScreen'
 import { SizeManagementScreen } from '../screens/settings/SizeManagementScreen'
 import { LocationManagementScreen } from '../screens/settings/LocationManagementScreen'
+import { CollectionManagementScreen } from '../screens/settings/CollectionManagementScreen'
 import { ReportsScreen } from '../screens/reports/ReportsScreen'
+import { NotificationsScreen } from '../screens/notifications/NotificationsScreen'
+import { GlobalSearchScreen } from '../screens/search/GlobalSearchScreen'
+import { CustomerListScreen } from '../screens/customers/CustomerListScreen'
+import { EnquiryFormScreen } from '../screens/enquiries/EnquiryFormScreen'
+import { AdminFunctionsScreen } from '../screens/admin/AdminFunctionsScreen'
+import { AdminPanelScreen } from '../screens/admin/AdminPanelScreen'
+import { EnhancedDashboardScreen } from '../screens/dashboard/EnhancedDashboardScreen'
+import { SettingsScreen } from '../screens/settings/SettingsScreen'
 import { MainStackParamList, DrawerParamList } from './types'
 
 const Stack = createStackNavigator<MainStackParamList>()
@@ -39,17 +48,23 @@ const DrawerNavigator: React.FC = () => {
         overlayColor: 'rgba(0, 0, 0, 0.5)',
       }}
     >
-      <Drawer.Screen name="Dashboard" component={DashboardStack} />
+      <Drawer.Screen name="Dashboard" component={EnhancedDashboardScreen} />
+      <Drawer.Screen name="GlobalSearch" component={GlobalSearchScreen} />
       <Drawer.Screen name="BrandManagement" component={BrandManagementScreen} />
       <Drawer.Screen name="CategoryManagement" component={CategoryManagementScreen} />
+      <Drawer.Screen name="CollectionManagement" component={CollectionManagementScreen} />
       <Drawer.Screen name="SizeManagement" component={SizeManagementScreen} />
       <Drawer.Screen name="Products" component={ProductsStack} />
       <Drawer.Screen name="Inventory" component={InventoryStack} />
       <Drawer.Screen name="LocationManagement" component={LocationManagementScreen} />
       <Drawer.Screen name="PurchaseOrders" component={OrdersStack} />
       <Drawer.Screen name="SalesOrders" component={OrdersStack} />
+      <Drawer.Screen name="Customers" component={CustomerListScreen} />
+      <Drawer.Screen name="Notifications" component={NotificationsScreen} />
       <Drawer.Screen name="Reports" component={ReportsScreen} />
-      <Drawer.Screen name="Settings" component={SettingsStack} />
+      <Drawer.Screen name="AdminPanel" component={AdminPanelScreen} />
+      <Drawer.Screen name="AdminFunctions" component={AdminFunctionsScreen} />
+      <Drawer.Screen name="Settings" component={SettingsScreen} />
     </Drawer.Navigator>
   )
 }
@@ -135,6 +150,15 @@ export const MainNavigator: React.FC = () => {
           }}
         />
         <Stack.Screen 
+          name="CollectionManagement" 
+          component={CollectionManagementScreen}
+          options={{ 
+            title: 'Collection Management',
+            headerStyle: { backgroundColor: theme.surface },
+            headerTintColor: theme.text
+          }}
+        />
+        <Stack.Screen 
           name="SizeManagement" 
           component={SizeManagementScreen}
           options={{ 
@@ -148,6 +172,60 @@ export const MainNavigator: React.FC = () => {
           component={LocationManagementScreen}
           options={{ 
             title: 'Location Management',
+            headerStyle: { backgroundColor: theme.surface },
+            headerTintColor: theme.text
+          }}
+        />
+        <Stack.Screen 
+          name="Customers" 
+          component={CustomerListScreen}
+          options={{ 
+            title: 'Customers',
+            headerStyle: { backgroundColor: theme.surface },
+            headerTintColor: theme.text
+          }}
+        />
+        <Stack.Screen 
+          name="Notifications" 
+          component={NotificationsScreen}
+          options={{ 
+            title: 'Notifications',
+            headerStyle: { backgroundColor: theme.surface },
+            headerTintColor: theme.text
+          }}
+        />
+        <Stack.Screen 
+          name="GlobalSearch" 
+          component={GlobalSearchScreen}
+          options={{ 
+            title: 'Search',
+            headerStyle: { backgroundColor: theme.surface },
+            headerTintColor: theme.text
+          }}
+        />
+        <Stack.Screen 
+          name="EnquiryForm" 
+          component={EnquiryFormScreen}
+          options={{ 
+            title: 'Product Enquiry',
+            headerStyle: { backgroundColor: theme.surface },
+            headerTintColor: theme.text
+          }}
+        />
+        <Stack.Screen 
+          name="AdminPanel" 
+          component={AdminPanelScreen}
+          options={{ 
+            title: 'Admin Panel',
+            headerStyle: { backgroundColor: theme.surface },
+            headerTintColor: theme.text
+          }}
+        />
+        <Stack.Screen 
+          name="AdminFunctions" 
+          component={AdminFunctionsScreen}
+          options={{ 
+            title: 'Admin Functions',
             headerStyle: { backgroundColor: theme.surface },
             headerTintColor: theme.text
           }}

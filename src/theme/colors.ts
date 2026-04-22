@@ -1,42 +1,59 @@
-// Light and Dark Theme Colors Configuration
+// Light and Dark Theme Colors Configuration - Matching Web Portal Exactly
 export const lightTheme = {
-  // Primary Colors (from web portal branding)
-  primary: '#2563EB',
-  primaryLight: '#3B82F6',
-  primaryDark: '#1D4ED8',
+  // Primary Colors - Deep steel-blue (House of Tiles logo color)
+  primary: 'hsl(216, 43%, 35%)', // --primary: 216 43% 35%
+  primaryLight: 'hsl(216, 60%, 58%)',
+  primaryDark: 'hsl(216, 43%, 25%)',
+  primaryForeground: 'hsl(210, 40%, 98%)', // --primary-foreground: 210 40% 98%
   
   // Secondary Colors
-  secondary: '#64748B',
-  secondaryLight: '#94A3B8',
-  secondaryDark: '#475569',
+  secondary: 'hsl(213, 27%, 93%)', // --secondary: 213 27% 93%
+  secondaryLight: 'hsl(213, 27%, 95%)',
+  secondaryDark: 'hsl(213, 27%, 85%)',
+  secondaryForeground: 'hsl(215, 35%, 20%)', // --secondary-foreground: 215 35% 20%
   
-  // Background Colors
-  background: '#F8FAFC',
-  surface: '#FFFFFF',
-  card: '#FFFFFF',
+  // Background Colors - Marble white bg
+  background: 'hsl(210, 20%, 97%)', // --background: 210 20% 97%
+  surface: 'hsl(0, 0%, 100%)', // --card: 0 0% 100%
+  card: 'hsl(0, 0%, 100%)',
+  cardForeground: 'hsl(215, 35%, 14%)', // --card-foreground: 215 35% 14%
   
   // Text Colors
-  text: '#0F172A',
-  textSecondary: '#64748B',
-  textTertiary: '#94A3B8',
-  textInverse: '#FFFFFF',
+  text: 'hsl(215, 35%, 14%)', // --foreground: 215 35% 14%
+  textSecondary: 'hsl(215, 16%, 47%)', // --muted-foreground: 215 16% 47%
+  textTertiary: 'hsl(215, 16%, 47%)',
+  textInverse: 'hsl(210, 40%, 98%)',
+  
+  // Muted Colors
+  muted: 'hsl(213, 27%, 93%)', // --muted: 213 27% 93%
+  mutedForeground: 'hsl(215, 16%, 47%)', // --muted-foreground: 215 16% 47%
+  
+  // Accent Colors
+  accent: 'hsl(213, 27%, 90%)', // --accent: 213 27% 90%
+  accentForeground: 'hsl(215, 35%, 20%)', // --accent-foreground: 215 35% 20%
   
   // Status Colors
-  success: '#10B981',
-  successLight: '#34D399',
-  successDark: '#059669',
+  success: 'hsl(142, 71%, 35%)', // --success: 142 71% 35%
+  successLight: 'hsl(142, 71%, 45%)',
+  successDark: 'hsl(142, 71%, 25%)',
+  successForeground: 'hsl(0, 0%, 98%)', // --success-foreground: 0 0% 98%
   
-  warning: '#F59E0B',
-  warningLight: '#FBBF24',
-  warningDark: '#D97706',
+  warning: 'hsl(35, 88%, 46%)', // --warning: 35 88% 46%
+  warningLight: 'hsl(35, 88%, 56%)',
+  warningDark: 'hsl(35, 88%, 36%)',
+  warningForeground: 'hsl(0, 0%, 98%)', // --warning-foreground: 0 0% 98%
   
-  danger: '#EF4444',
-  dangerLight: '#F87171',
-  dangerDark: '#DC2626',
+  error: 'hsl(0, 72%, 51%)', // --destructive: 0 72% 51%
+  danger: 'hsl(0, 72%, 51%)',
+  dangerLight: 'hsl(0, 72%, 61%)',
+  dangerDark: 'hsl(0, 72%, 41%)',
+  destructive: 'hsl(0, 72%, 51%)',
+  destructiveForeground: 'hsl(0, 0%, 98%)', // --destructive-foreground: 0 0% 98%
   
-  info: '#3B82F6',
-  infoLight: '#60A5FA',
-  infoDark: '#2563EB',
+  info: 'hsl(210, 79%, 46%)', // --info: 210 79% 46%
+  infoLight: 'hsl(210, 79%, 56%)',
+  infoDark: 'hsl(210, 79%, 36%)',
+  infoForeground: 'hsl(0, 0%, 98%)', // --info-foreground: 0 0% 98%
   
   // Gray Scale
   white: '#FFFFFF',
@@ -53,9 +70,11 @@ export const lightTheme = {
   black: '#000000',
   
   // Border Colors
-  border: '#E2E8F0',
-  borderLight: '#F1F5F9',
-  borderDark: '#CBD5E1',
+  border: 'hsl(213, 27%, 88%)', // --border: 213 27% 88%
+  borderLight: 'hsl(213, 27%, 93%)',
+  borderDark: 'hsl(213, 27%, 80%)',
+  input: 'hsl(213, 27%, 88%)', // --input: 213 27% 88%
+  ring: 'hsl(216, 43%, 35%)', // --ring: 216 43% 35%
   
   // Shadow Colors
   shadow: 'rgba(0, 0, 0, 0.1)',
@@ -66,77 +85,100 @@ export const lightTheme = {
   overlayLight: 'rgba(0, 0, 0, 0.3)',
   
   // Input Colors
-  inputBackground: '#FFFFFF',
-  inputBorder: '#E2E8F0',
-  inputPlaceholder: '#94A3B8',
+  inputBackground: 'hsl(0, 0%, 100%)',
+  inputBorder: 'hsl(213, 27%, 88%)',
+  inputPlaceholder: 'hsl(215, 16%, 47%)',
   
   // Tab Colors
-  tabActive: '#2563EB',
-  tabInactive: '#94A3B8',
-  tabBackground: '#FFFFFF',
+  tabActive: 'hsl(216, 43%, 35%)',
+  tabInactive: 'hsl(215, 16%, 47%)',
+  tabBackground: 'hsl(0, 0%, 100%)',
   
   // Skeleton Colors
-  skeletonBase: '#E2E8F0',
+  skeletonBase: 'hsl(213, 27%, 93%)',
   skeletonHighlight: 'rgba(255, 255, 255, 0.8)',
+  
+  // Popover Colors
+  popover: 'hsl(0, 0%, 100%)', // --popover: 0 0% 100%
+  popoverForeground: 'hsl(215, 35%, 14%)', // --popover-foreground: 215 35% 14%
 }
 
 export const darkTheme = {
-  // Primary Colors (same brand colors but adjusted for dark theme)
-  primary: '#3B82F6',
-  primaryLight: '#60A5FA',
-  primaryDark: '#2563EB',
+  // Primary Colors - Lighter steel blue for dark theme
+  primary: 'hsl(216, 60%, 58%)', // --primary: 216 60% 58%
+  primaryLight: 'hsl(216, 60%, 68%)',
+  primaryDark: 'hsl(216, 60%, 48%)',
+  primaryForeground: 'hsl(216, 40%, 8%)', // --primary-foreground: 216 40% 8%
   
   // Secondary Colors
-  secondary: '#94A3B8',
-  secondaryLight: '#CBD5E1',
-  secondaryDark: '#64748B',
+  secondary: 'hsl(216, 30%, 17%)', // --secondary: 216 30% 17%
+  secondaryLight: 'hsl(216, 30%, 25%)',
+  secondaryDark: 'hsl(216, 30%, 12%)',
+  secondaryForeground: 'hsl(210, 30%, 92%)', // --secondary-foreground: 210 30% 92%
   
-  // Background Colors
-  background: '#0F172A',
-  surface: '#1E293B',
-  card: '#334155',
+  // Background Colors - Deep navy bg
+  background: 'hsl(216, 40%, 8%)', // --background: 216 40% 8%
+  surface: 'hsl(216, 38%, 11%)', // --card: 216 38% 11%
+  card: 'hsl(216, 38%, 11%)',
+  cardForeground: 'hsl(210, 30%, 92%)', // --card-foreground: 210 30% 92%
   
   // Text Colors
-  text: '#F8FAFC',
-  textSecondary: '#CBD5E1',
-  textTertiary: '#94A3B8',
-  textInverse: '#0F172A',
+  text: 'hsl(210, 30%, 92%)', // --foreground: 210 30% 92%
+  textSecondary: 'hsl(213, 20%, 60%)', // --muted-foreground: 213 20% 60%
+  textTertiary: 'hsl(213, 20%, 60%)',
+  textInverse: 'hsl(216, 40%, 8%)',
+  
+  // Muted Colors
+  muted: 'hsl(216, 30%, 17%)', // --muted: 216 30% 17%
+  mutedForeground: 'hsl(213, 20%, 60%)', // --muted-foreground: 213 20% 60%
+  
+  // Accent Colors
+  accent: 'hsl(216, 30%, 20%)', // --accent: 216 30% 20%
+  accentForeground: 'hsl(210, 30%, 92%)', // --accent-foreground: 210 30% 92%
   
   // Status Colors
-  success: '#34D399',
-  successLight: '#6EE7B7',
-  successDark: '#10B981',
+  success: 'hsl(142, 64%, 42%)', // --success: 142 64% 42%
+  successLight: 'hsl(142, 64%, 52%)',
+  successDark: 'hsl(142, 64%, 32%)',
+  successForeground: 'hsl(0, 0%, 98%)', // --success-foreground: 0 0% 98%
   
-  warning: '#FBBF24',
-  warningLight: '#FCD34D',
-  warningDark: '#F59E0B',
+  warning: 'hsl(35, 88%, 55%)', // --warning: 35 88% 55%
+  warningLight: 'hsl(35, 88%, 65%)',
+  warningDark: 'hsl(35, 88%, 45%)',
+  warningForeground: 'hsl(0, 0%, 10%)', // --warning-foreground: 0 0% 10%
   
-  danger: '#F87171',
-  dangerLight: '#FCA5A5',
-  dangerDark: '#EF4444',
+  error: 'hsl(0, 60%, 45%)', // --destructive: 0 60% 45%
+  danger: 'hsl(0, 60%, 45%)',
+  dangerLight: 'hsl(0, 60%, 55%)',
+  dangerDark: 'hsl(0, 60%, 35%)',
+  destructive: 'hsl(0, 60%, 45%)',
+  destructiveForeground: 'hsl(0, 0%, 98%)', // --destructive-foreground: 0 0% 98%
   
-  info: '#60A5FA',
-  infoLight: '#93C5FD',
-  infoDark: '#3B82F6',
+  info: 'hsl(210, 79%, 55%)', // --info: 210 79% 55%
+  infoLight: 'hsl(210, 79%, 65%)',
+  infoDark: 'hsl(210, 79%, 45%)',
+  infoForeground: 'hsl(0, 0%, 10%)', // --info-foreground: 0 0% 10%
   
-  // Gray Scale (inverted for dark theme)
-  white: '#0F172A',
-  gray50: '#1E293B',
-  gray100: '#334155',
-  gray200: '#475569',
-  gray300: '#64748B',
-  gray400: '#94A3B8',
-  gray500: '#CBD5E1',
-  gray600: '#E2E8F0',
-  gray700: '#F1F5F9',
-  gray800: '#F8FAFC',
+  // Gray Scale (adjusted for dark theme)
+  white: 'hsl(216, 40%, 8%)',
+  gray50: 'hsl(216, 38%, 11%)',
+  gray100: 'hsl(216, 30%, 17%)',
+  gray200: 'hsl(216, 30%, 20%)',
+  gray300: 'hsl(213, 20%, 60%)',
+  gray400: 'hsl(210, 30%, 92%)',
+  gray500: 'hsl(210, 30%, 92%)',
+  gray600: 'hsl(210, 30%, 92%)',
+  gray700: 'hsl(210, 30%, 92%)',
+  gray800: 'hsl(210, 30%, 92%)',
   gray900: '#FFFFFF',
   black: '#FFFFFF',
   
   // Border Colors
-  border: '#475569',
-  borderLight: '#334155',
-  borderDark: '#64748B',
+  border: 'hsl(216, 30%, 20%)', // --border: 216 30% 20%
+  borderLight: 'hsl(216, 30%, 17%)',
+  borderDark: 'hsl(216, 30%, 25%)',
+  input: 'hsl(216, 30%, 20%)', // --input: 216 30% 20%
+  ring: 'hsl(216, 60%, 58%)', // --ring: 216 60% 58%
   
   // Shadow Colors
   shadow: 'rgba(0, 0, 0, 0.3)',
@@ -147,18 +189,22 @@ export const darkTheme = {
   overlayLight: 'rgba(0, 0, 0, 0.5)',
   
   // Input Colors
-  inputBackground: '#334155',
-  inputBorder: '#475569',
-  inputPlaceholder: '#94A3B8',
+  inputBackground: 'hsl(216, 30%, 17%)',
+  inputBorder: 'hsl(216, 30%, 20%)',
+  inputPlaceholder: 'hsl(213, 20%, 60%)',
   
   // Tab Colors
-  tabActive: '#3B82F6',
-  tabInactive: '#94A3B8',
-  tabBackground: '#1E293B',
+  tabActive: 'hsl(216, 60%, 58%)',
+  tabInactive: 'hsl(213, 20%, 60%)',
+  tabBackground: 'hsl(216, 38%, 11%)',
   
   // Skeleton Colors
-  skeletonBase: '#475569',
+  skeletonBase: 'hsl(216, 30%, 20%)',
   skeletonHighlight: 'rgba(255, 255, 255, 0.1)',
+  
+  // Popover Colors
+  popover: 'hsl(216, 38%, 11%)', // --popover: 216 38% 11%
+  popoverForeground: 'hsl(210, 30%, 92%)', // --popover-foreground: 210 30% 92%
 }
 
 export type Theme = typeof lightTheme

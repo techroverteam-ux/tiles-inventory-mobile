@@ -32,8 +32,14 @@ export type MainStackParamList = {
   SalesOrderDetail: { orderId: string }
   BrandManagement: undefined
   CategoryManagement: undefined
+  CollectionManagement: undefined
   SizeManagement: undefined
   LocationManagement: undefined
+  Customers: undefined
+  Notifications: undefined
+  GlobalSearch: undefined
+  EnquiryForm: { productId?: string; productName?: string }
+  AdminFunctions: undefined
 }
 
 // Drawer Params
@@ -41,14 +47,19 @@ export type DrawerParamList = {
   Dashboard: undefined
   BrandManagement: undefined
   CategoryManagement: undefined
+  CollectionManagement: undefined
   SizeManagement: undefined
   Products: undefined
   Inventory: undefined
   LocationManagement: undefined
   PurchaseOrders: undefined
   SalesOrders: undefined
+  Customers: undefined
+  Notifications: undefined
+  GlobalSearch: undefined
   Reports: undefined
   Settings: undefined
+  AdminFunctions: undefined
 }
 
 // Dashboard Stack Params

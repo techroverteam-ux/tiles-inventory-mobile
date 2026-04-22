@@ -134,7 +134,7 @@ const ToastItem: React.FC<{
   const styles = StyleSheet.create({
     container: {
       position: 'absolute',
-      top: 0,
+      bottom: 0,
       left: spacing.base,
       right: spacing.base,
       backgroundColor: colors.background,
@@ -271,7 +271,14 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
     >
       {children}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <View style={{ paddingTop: 60, gap: spacing.sm }}>
+        <View style={{ 
+          position: 'absolute',
+          bottom: 100,
+          left: 0,
+          right: 0,
+          alignItems: 'center',
+          gap: spacing.sm 
+        }}>
           {toasts.map((toast, index) => (
             <ToastItem
               key={toast.id}

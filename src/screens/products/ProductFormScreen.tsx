@@ -21,11 +21,13 @@ import {
   productService,
   brandService,
   categoryService,
+  collectionService,
   sizeService,
   finishTypeService,
   locationService,
   Brand,
   Category,
+  Collection,
   Size,
   FinishType,
   Location,
@@ -37,10 +39,15 @@ type ProductFormRouteProp = RouteProp<MainStackParamList, 'ProductForm'>
 interface FormData {
   name: string
   code: string
+  description: string
   brandId: string
   categoryId: string
+  collectionId: string
   sizeId: string
   finishTypeId: string
+  length: string
+  width: string
+  thickness: string
   sqftPerBox: string
   pcsPerBox: string
   locationId: string
@@ -62,10 +69,15 @@ export const ProductFormScreen: React.FC = () => {
   const [formData, setFormData] = useState<FormData>({
     name: '',
     code: '',
+    description: '',
     brandId: '',
     categoryId: '',
+    collectionId: '',
     sizeId: '',
     finishTypeId: '',
+    length: '',
+    width: '',
+    thickness: '',
     sqftPerBox: '1',
     pcsPerBox: '1',
     locationId: '',
@@ -83,6 +95,8 @@ export const ProductFormScreen: React.FC = () => {
   const [brands, setBrands] = useState<Brand[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [filteredCategories, setFilteredCategories] = useState<Category[]>([])
+  const [collections, setCollections] = useState<any[]>([])
+  const [filteredCollections, setFilteredCollections] = useState<any[]>([])
   const [sizes, setSizes] = useState<Size[]>([])
   const [filteredSizes, setFilteredSizes] = useState<Size[]>([])
   const [finishTypes, setFinishTypes] = useState<FinishType[]>([])
@@ -91,9 +105,10 @@ export const ProductFormScreen: React.FC = () => {
   const fetchMasterData = useCallback(async () => {
     setLoading(true)
     try {
-      const [brandsRes, categoriesRes, sizesRes, finishTypesRes, locationsRes] = await Promise.all([
+      const [brandsRes, categoriesRes, collectionsRes, sizesRes, finishTypesRes, locationsRes] = await Promise.all([
         brandService.getBrands(),
         categoryService.getCategories(),
+        collectionService.getCollections(),
         sizeService.getSizes(),
         finishTypeService.getFinishTypes(),
         locationService.getLocations()
@@ -101,6 +116,7 @@ export const ProductFormScreen: React.FC = () => {
 
       setBrands(brandsRes.brands.filter(b => b.isActive))
       setCategories(categoriesRes.categories.filter(c => c.isActive))
+      setCollections(collectionsRes.collections.filter(c => c.isActive))
       setSizes(sizesRes.sizes.filter(s => s.isActive))
       setFinishTypes(finishTypesRes.finishTypes.filter(f => f.isActive))
       setLocations(locationsRes.locations.filter(l => l.isActive))
@@ -125,6 +141,17 @@ export const ProductFormScreen: React.FC = () => {
       setFilteredCategories(categories)
     }
   }, [formData.brandId, categories])
+
+  // Filter collections when brand/category changes
+  useEffect(() => {
+    if (formData.brandId && formData.categoryId) {
+      collectionService.getCollections(formData.brandId, formData.categoryId)
+        .then(res => setFilteredCollections(res.collections.filter(c => c.isActive)))
+        .catch(() => setFilteredCollections(collections))
+    } else {
+      setFilteredCollections(collections)
+    }
+  }, [formData.brandId, formData.categoryId, collections])
 
   // Filter sizes when brand/category changes
   useEffect(() => {
@@ -209,10 +236,14 @@ export const ProductFormScreen: React.FC = () => {
       const productData: CreateProductRequest = {
         name: formData.name.trim(),
         code: formData.code.trim(),
+        description: formData.description.trim() || undefined,
         brandId: formData.brandId,
         categoryId: formData.categoryId,
+        collectionId: formData.collectionId || undefined,
         sizeId: formData.sizeId || undefined,
-        finishTypeId: formData.finishTypeId,
+        length: formData.length ? parseFloat(formData.length) : undefined,
+        width: formData.width ? parseFloat(formData.width) : undefined,
+        thickness: formData.thickness ? parseFloat(formData.thickness) : undefined,
         sqftPerBox: parseFloat(formData.sqftPerBox),
         pcsPerBox: parseInt(formData.pcsPerBox),
         locationId: formData.locationId,
@@ -474,6 +505,55 @@ export const ProductFormScreen: React.FC = () => {
             true,
             !formData.brandId
           )}
+
+          {renderDropdown(
+            'Collection',
+            formData.collectionId,
+            filteredCollections,
+            (value) => updateFormData('collectionId', value),
+            'Select collection (optional)',
+            false,
+            !formData.categoryId
+          )}
+
+          <TextInput
+            label="Description"
+            value={formData.description}
+            onChangeText={(value) => updateFormData('description', value)}
+            placeholder="Enter product description (optional)"
+            multiline
+            numberOfLines={3}
+          />
+
+          {/* Dimensions */}
+          <View style={styles.formRow}>
+            <View style={styles.formRowItem}>
+              <TextInput
+                label="Length (mm)"
+                value={formData.length}
+                onChangeText={(value) => updateFormData('length', value)}
+                placeholder="0"
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View style={styles.formRowItem}>
+              <TextInput
+                label="Width (mm)"
+                value={formData.width}
+                onChangeText={(value) => updateFormData('width', value)}
+                placeholder="0"
+                keyboardType="decimal-pad"
+              />
+            </View>
+          </View>
+
+          <TextInput
+            label="Thickness (mm)"
+            value={formData.thickness}
+            onChangeText={(value) => updateFormData('thickness', value)}
+            placeholder="0"
+            keyboardType="decimal-pad"
+          />
 
           {/* Size and Finish Type */}
           <View style={styles.formRow}>

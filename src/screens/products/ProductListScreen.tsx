@@ -98,13 +98,13 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
     <Card style={styles.productCard}>
       <View style={styles.productHeader}>
         <View style={styles.productInfo}>
-          <Text style={[styles.productName, { color: theme.text }]}>{item.name}</Text>
+          <Text style={[styles.productName, { color: theme.text }]}>{item?.name || 'Unknown Product'}</Text>
           <Text style={[styles.productCode, { color: theme.textSecondary }]}>
-            Code: {item.code}
+            Code: {item?.code || 'N/A'}
           </Text>
           <Text style={[styles.productDetails, { color: theme.textSecondary }]}>
-            {item.brand.name} • {item.category.name}
-            {item.size && ` • ${item.size.name}`}
+            {item?.brand?.name || 'Unknown Brand'} • {item?.category?.name || 'Unknown Category'}
+            {item?.size?.name && ` • ${item.size.name}`}
           </Text>
         </View>
         <View style={styles.productActions}>
@@ -124,10 +124,10 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
       </View>
       <View style={styles.productFooter}>
         <Text style={[styles.productMeta, { color: theme.textSecondary }]}>
-          {item.sqftPerBox} sq ft/box • {item.pcsPerBox} pcs/box
+          {item?.sqftPerBox || 0} sq ft/box • {item?.pcsPerBox || 0} pcs/box
         </Text>
         <Text style={[styles.productMeta, { color: theme.textSecondary }]}>
-          {item.finishType.name}
+          {item?.finishType?.name || 'Unknown Finish'}
         </Text>
       </View>
     </Card>
