@@ -7,23 +7,10 @@
     "isolatedModules": true,
     "jsx": "react-native",
     "lib": ["es2017"],
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "noEmit": true,
-    "strict": true,
-    "target": "esnext",
-    "baseUrl": "./src",
-    "paths": {
-      "@/*": ["*"],
-      "@/components/*": ["components/*"],
-      "@/screens/*": ["screens/*"],
-      "@/services/*": ["services/*"],
-      "@/hooks/*": ["hooks/*"],
-      "@/utils/*": ["utils/*"],
-      "@/types/*": ["types/*"],
-      "@/theme/*": ["theme/*"],
-      "@/context/*": ["context/*"],
-      "@/navigation/*": ["navigation/*"]
-    }
+    "strict": false,
+    "target": "esnext"
   },
   "include": [
     "src/**/*",

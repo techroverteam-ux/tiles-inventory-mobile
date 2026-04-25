@@ -7,20 +7,34 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  SafeAreaView,
 } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
+import { Header } from '../../components/navigation/Header'
+import { Card } from '../../components/common/Card'
+import { TextInput } from '../../components/common/TextInput'
+import { LoadingButton } from '../../components/common/LoadingButton'
+import { Skeleton } from '../../components/loading/Skeleton'
 import { LoadingSpinner } from '../../components/loading'
 import { collectionService, Collection } from '../../services/api/ApiServices'
 import { spacing, typography, borderRadius } from '../../theme'
 
-export const CollectionManagementScreen: React.FC = () => {
+interface CollectionManagementScreenProps {
+  navigation: any
+}
+
+export const CollectionManagementScreen: React.FC<CollectionManagementScreenProps> = ({ navigation }) => {
   const { theme } = useTheme()
   const { showToast } = useToast()
   const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [editingCollection, setEditingCollection] = useState<Collection | null>(null)
+  const [formData, setFormData] = useState({ name: '', description: '' })
+  const [submitting, setSubmitting] = useState(false)
 
   const styles = StyleSheet.create({
     container: {
@@ -58,13 +72,26 @@ export const CollectionManagementScreen: React.FC = () => {
       flex: 1,
       padding: spacing.base,
     },
-    collectionCard: {
-      backgroundColor: theme.surface,
+    content: {
+      flex: 1,
       padding: spacing.base,
+    },
+    formCard: {
+      marginBottom: spacing.base,
+    },
+    formTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.semibold,
+      color: theme.text,
+      marginBottom: spacing.base,
+    },
+    formActions: {
+      flexDirection: 'row',
+      gap: spacing.base,
+      marginTop: spacing.base,
+    },
+    collectionCard: {
       marginBottom: spacing.sm,
-      borderRadius: borderRadius.base,
-      borderWidth: 1,
-      borderColor: theme.border,
     },
     collectionHeader: {
       flexDirection: 'row',
@@ -163,6 +190,46 @@ export const CollectionManagementScreen: React.FC = () => {
     setRefreshing(false)
   }
 
+  const handleSubmit = async () => {
+    if (!formData.name.trim()) {
+      showToast('Collection name is required', 'warning')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      if (editingCollection) {
+        const updated = await collectionService.updateCollection(editingCollection.id, formData)
+        setCollections(collections.map(c => c.id === editingCollection.id ? updated : c))
+        showToast('Collection updated successfully', 'success')
+      } else {
+        const created = await collectionService.createCollection(formData)
+        setCollections([created, ...collections])
+        showToast('Collection created successfully', 'success')
+      }
+      resetForm()
+    } catch (error) {
+      showToast('Failed to save collection', 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({ name: '', description: '' })
+    setEditingCollection(null)
+    setShowAddForm(false)
+  }
+
+  const handleEdit = (collection: Collection) => {
+    setEditingCollection(collection)
+    setFormData({
+      name: collection.name,
+      description: collection.description || '',
+    })
+    setShowAddForm(true)
+  }
+
   const handleDelete = (collection: Collection) => {
     Alert.alert(
       'Delete Collection',
@@ -189,13 +256,13 @@ export const CollectionManagementScreen: React.FC = () => {
   }
 
   const renderCollection = ({ item }: { item: Collection }) => (
-    <View style={styles.collectionCard}>
+    <Card style={styles.collectionCard}>
       <View style={styles.collectionHeader}>
         <Text style={styles.collectionName}>{item.name}</Text>
         <View style={styles.collectionActions}>
           <TouchableOpacity
             style={[styles.actionButton, styles.editButton]}
-            onPress={() => {/* TODO: Navigate to edit form */}}
+            onPress={() => handleEdit(item)}
           >
             <Icon name="edit" size={20} color={theme.warning} />
           </TouchableOpacity>
@@ -225,10 +292,18 @@ export const CollectionManagementScreen: React.FC = () => {
           </Text>
         </View>
         <Text style={styles.createdDate}>
-          {new Date(item.createdAt).toLocaleDateString()}
+          {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '-'}
         </Text>
       </View>
-    </View>
+    </Card>
+  )
+
+  const renderSkeleton = () => (
+    <Card style={styles.collectionCard}>
+      <Skeleton height={20} width="60%" style={{ marginBottom: spacing.sm }} />
+      <Skeleton height={16} width="80%" style={{ marginBottom: spacing.xs }} />
+      <Skeleton height={14} width="40%" />
+    </Card>
   )
 
   if (loading) {
@@ -236,42 +311,81 @@ export const CollectionManagementScreen: React.FC = () => {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Collections</Text>
+    <SafeAreaView style={styles.container}>
+      <Header title="Collection Management" showBack onBackPress={() => navigation.goBack()} />
+
+      <View style={styles.content}>
+        {showAddForm && (
+          <Card style={styles.formCard} padding="lg">
+            <Text style={styles.formTitle}>
+              {editingCollection ? 'Edit Collection' : 'Add New Collection'}
+            </Text>
+
+            <TextInput
+              label="Collection Name"
+              value={formData.name}
+              onChangeText={(text) => setFormData({ ...formData, name: text })}
+              placeholder="Enter collection name"
+              required
+            />
+
+            <TextInput
+              label="Description"
+              value={formData.description}
+              onChangeText={(text) => setFormData({ ...formData, description: text })}
+              placeholder="Enter collection description (optional)"
+              multiline
+              numberOfLines={3}
+            />
+
+            <View style={styles.formActions}>
+              <LoadingButton
+                title="Cancel"
+                onPress={resetForm}
+                variant="outline"
+                style={{ flex: 1 }}
+              />
+              <LoadingButton
+                title={editingCollection ? 'Update' : 'Create'}
+                onPress={handleSubmit}
+                loading={submitting}
+                variant="primary"
+                style={{ flex: 1 }}
+              />
+            </View>
+          </Card>
+        )}
+
+        <FlatList
+          data={loading ? Array(5).fill({}) : collections}
+          renderItem={loading ? renderSkeleton : renderCollection}
+          keyExtractor={(item, index) => loading ? index.toString() : item.id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.primary]} />
+          }
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={styles.emptyContainer}>
+                <Icon name="collections" size={64} color={theme.textSecondary} />
+                <Text style={styles.emptyText}>
+                  No collections found.{"\n"}Add your first collection to get started.
+                </Text>
+              </View>
+            ) : null
+          }
+        />
+      </View>
+
+      {!showAddForm && (
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => {/* TODO: Navigate to add form */}}
+          onPress={() => setShowAddForm(true)}
         >
           <Icon name="add" size={20} color={theme.textInverse} />
           <Text style={styles.addButtonText}>Add Collection</Text>
         </TouchableOpacity>
-      </View>
-
-      <View style={styles.listContainer}>
-        {collections.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Icon name="collections" size={64} color={theme.textSecondary} />
-            <Text style={styles.emptyText}>
-              No collections found.{'\n'}Add your first collection to get started.
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={collections}
-            renderItem={renderCollection}
-            keyExtractor={(item) => item.id}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={[theme.primary]}
-              />
-            }
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-      </View>
-    </View>
+      )}
+    </SafeAreaView>
   )
 }

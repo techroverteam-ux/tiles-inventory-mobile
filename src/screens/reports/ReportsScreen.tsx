@@ -47,7 +47,7 @@ interface DesignStockReport {
 
 export const ReportsScreen: React.FC<ReportsScreenProps> = ({ navigation }) => {
   const { theme, isDark, toggleTheme } = useTheme()
-  const { showToast } = useToast()
+  const { showSuccess, showError, showInfo } = useToast()
   const [activeReport, setActiveReport] = useState<'overview' | 'design-stock'>('overview')
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -213,9 +213,9 @@ export const ReportsScreen: React.FC<ReportsScreenProps> = ({ navigation }) => {
     try {
       setLoading(true)
       const response = await apiClient.get<DesignStockReport>('/reports/design-stock')
-      setDesignStockData(response)
+      setDesignStockData(response.data)
     } catch (error) {
-      showToast('Failed to load design stock report', 'error')
+      showError('Failed to load design stock report')
     } finally {
       setLoading(false)
     }
@@ -279,7 +279,7 @@ export const ReportsScreen: React.FC<ReportsScreenProps> = ({ navigation }) => {
             <Text style={styles.overviewDescription}>{report.description}</Text>
             <TouchableOpacity
               style={styles.generateButton}
-              onPress={() => showToast(`${report.title} - Coming Soon`, 'info')}
+              onPress={() => showInfo(`${report.title} - Coming Soon`)}
             >
               <Text style={styles.generateButtonText}>Generate Report</Text>
             </TouchableOpacity>

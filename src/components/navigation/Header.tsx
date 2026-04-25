@@ -7,6 +7,8 @@ interface HeaderProps {
   title: string
   showBack?: boolean
   navigation?: any
+  onBackPress?: () => void
+  onBack?: () => void
   rightComponent?: React.ReactNode
 }
 
@@ -14,6 +16,8 @@ export const Header: React.FC<HeaderProps> = ({
   title,
   showBack = false,
   navigation,
+  onBackPress,
+  onBack,
   rightComponent,
 }) => {
   const { theme } = useTheme()
@@ -56,7 +60,17 @@ export const Header: React.FC<HeaderProps> = ({
         {showBack && (
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation?.goBack()}
+            onPress={() => {
+              if (onBackPress) {
+                onBackPress()
+                return
+              }
+              if (onBack) {
+                onBack()
+                return
+              }
+              navigation?.goBack()
+            }}
             activeOpacity={0.7}
           >
             <Icon name="arrow-back" size={24} color={theme.text} />

@@ -31,8 +31,8 @@ export const SessionProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [sessionExpiry, setSessionExpiry] = useState<Date | null>(null)
-  const [idleTimer, setIdleTimer] = useState<NodeJS.Timeout | null>(null)
-  const [warningTimer, setWarningTimer] = useState<NodeJS.Timeout | null>(null)
+  const [idleTimer, setIdleTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const [warningTimer, setWarningTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [showIdleWarning, setShowIdleWarning] = useState(false)
 
   // Clear all timers
@@ -76,7 +76,7 @@ export const SessionProvider: React.FC<{ children: ReactNode }> = ({ children })
     try {
       setIsLoading(true)
       
-      const response = await apiClient.post('/auth/login', { email, password })
+      const response: any = await apiClient.post('/auth/login', { email, password })
       console.log('Login response:', response)
       
       // Handle the actual API response structure

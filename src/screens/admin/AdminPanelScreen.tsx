@@ -51,7 +51,7 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
   const fetchSystemStats = async () => {
     try {
       // Mock API call - replace with actual API
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
       setSystemStats({
         totalUsers: 5,
         totalSessions: 12,
@@ -149,7 +149,7 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
     setOperationLoading('export')
     try {
       // Mock export operation
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 2000))
       showSuccess('Data exported successfully')
     } catch (error) {
       showError('Data export failed')
@@ -162,7 +162,7 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
     setOperationLoading('backup')
     try {
       // Mock backup operation
-      await new Promise(resolve => setTimeout(resolve, 3000))
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 3000))
       showSuccess('System backup completed')
       await fetchSystemStats() // Refresh stats
     } catch (error) {
@@ -183,7 +183,7 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
           onPress: async () => {
             setOperationLoading('cache')
             try {
-              await new Promise(resolve => setTimeout(resolve, 1000))
+              await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
               showSuccess('Cache reset successfully')
             } catch (error) {
               showError('Cache reset failed')

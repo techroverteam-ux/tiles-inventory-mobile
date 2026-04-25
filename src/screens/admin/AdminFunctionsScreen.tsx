@@ -128,11 +128,11 @@ export const AdminFunctionsScreen: React.FC<AdminFunctionsScreenProps> = ({ navi
   const performCleanup = async () => {
     setCleanupLoading(true)
     try {
-      const response = await apiClient.post('/admin/cleanup')
+      const response: any = await apiClient.post('/admin/cleanup')
       
       Alert.alert(
         'Cleanup Complete',
-        `Successfully cleaned up:\n• ${response.deleted.brands} brands\n• ${response.deleted.categories} categories\n• ${response.deleted.sizes} sizes\n• ${response.deleted.products} products`,
+        `Successfully cleaned up:\n• ${response.data.deleted.brands} brands\n• ${response.data.deleted.categories} categories\n• ${response.data.deleted.sizes} sizes\n• ${response.data.deleted.products} products`,
         [{ text: 'OK' }]
       )
       
@@ -178,11 +178,11 @@ export const AdminFunctionsScreen: React.FC<AdminFunctionsScreenProps> = ({ navi
   const performDangerOperation = async () => {
     setDangerLoading(true)
     try {
-      const response = await apiClient.post('/admin/danger')
+      const response: any = await apiClient.post('/admin/danger')
       
       Alert.alert(
         'Operation Complete',
-        response.message || 'Danger operation completed',
+        response.data.message || 'Danger operation completed',
         [{ text: 'OK' }]
       )
       

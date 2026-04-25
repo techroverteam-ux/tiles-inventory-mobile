@@ -166,3 +166,6 @@ dist/
 .metro-health-check*
 
 # @end expo-cli
+
+
+tiles-inventory/

@@ -74,40 +74,34 @@ class ApiClient {
   }
 
   // HTTP Methods
-  async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.instance.get<T>(url, config)
-    return response.data
+  async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    return this.instance.get<T>(url, config)
   }
 
-  async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.instance.post<T>(url, data, config)
-    return response.data
+  async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    return this.instance.post<T>(url, data, config)
   }
 
-  async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.instance.put<T>(url, data, config)
-    return response.data
+  async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    return this.instance.put<T>(url, data, config)
   }
 
-  async patch<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.instance.patch<T>(url, data, config)
-    return response.data
+  async patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    return this.instance.patch<T>(url, data, config)
   }
 
-  async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.instance.delete<T>(url, config)
-    return response.data
+  async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    return this.instance.delete<T>(url, config)
   }
 
-  async uploadFile<T>(url: string, file: FormData, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.instance.post<T>(url, file, {
+  async uploadFile<T = any>(url: string, file: FormData, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    return this.instance.post<T>(url, file, {
       ...config,
       headers: {
         ...config?.headers,
         'Content-Type': 'multipart/form-data'
       }
     })
-    return response.data
   }
 }
 

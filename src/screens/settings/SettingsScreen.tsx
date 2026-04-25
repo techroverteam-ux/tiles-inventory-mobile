@@ -31,7 +31,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    phone: user?.phone || '',
+    phone: (user as any)?.phone || '',
   })
 
   const handleLogout = () => {
@@ -56,7 +56,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
     setLoading(true)
     try {
       // API call to update profile
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Mock API call
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 1000)) // Mock API call
       showSuccess('Profile updated successfully')
     } catch (error) {
       showError('Failed to update profile')

@@ -87,7 +87,8 @@ android {
         versionName "1.0"
         
         ndk {
-            abiFilters "armeabi-v7a", "arm64-v8a"
+            // Keep ARM for real devices and include x86 ABIs for emulator runtime.
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
         }
     }
     signingConfigs {

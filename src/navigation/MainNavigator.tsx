@@ -7,6 +7,7 @@ import { DashboardStack } from './stacks/DashboardStack'
 import { InventoryStack } from './stacks/InventoryStack'
 import { ProductsStack } from './stacks/ProductsStack'
 import { OrdersStack } from './stacks/OrdersStack'
+import { CustomersStack } from './stacks/CustomersStack'
 import { SettingsStack } from './stacks/SettingsStack'
 import { ProductFormScreen } from '../screens/products/ProductFormScreen'
 import { ProductListScreen } from '../screens/products/ProductListScreenComplete'
@@ -37,6 +38,7 @@ const DrawerNavigator: React.FC = () => {
 
   return (
     <Drawer.Navigator
+      id="MainDrawer"
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
         headerShown: false,
@@ -59,7 +61,7 @@ const DrawerNavigator: React.FC = () => {
       <Drawer.Screen name="LocationManagement" component={LocationManagementScreen} />
       <Drawer.Screen name="PurchaseOrders" component={OrdersStack} />
       <Drawer.Screen name="SalesOrders" component={OrdersStack} />
-      <Drawer.Screen name="Customers" component={CustomerListScreen} />
+      <Drawer.Screen name="Customers" component={CustomersStack} />
       <Drawer.Screen name="Notifications" component={NotificationsScreen} />
       <Drawer.Screen name="Reports" component={ReportsScreen} />
       <Drawer.Screen name="AdminPanel" component={AdminPanelScreen} />

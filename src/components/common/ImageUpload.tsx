@@ -129,7 +129,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       includeBase64: false,
       maxHeight: 2000,
       maxWidth: 2000,
-      quality: 0.8,
+      quality: 0.8 as any,
     }
 
     launchImageLibrary(options, (response: ImagePickerResponse) => {

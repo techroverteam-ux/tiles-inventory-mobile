@@ -23,8 +23,7 @@ import { DashboardNavigationProp } from '../../navigation/types'
 import { 
   dashboardService, 
   DashboardStats, 
-  SalesData,
-  Batch
+  SalesData
 } from '../../services/api/ApiServices'
 
 interface ActivityItem {
@@ -239,7 +238,7 @@ export const DashboardScreen: React.FC = () => {
           <Icon name={getActivityIcon()} size={16} color={theme.textInverse} />
         </View>
         <View style={styles.activityContent}>
-          <Text style={styles.activityTitle}>{item.title}</Text>
+          <Text style={styles.activityItemTitle}>{item.title}</Text>
           <Text style={styles.activityDescription}>{item.description}</Text>
           <Text style={styles.activityTimestamp}>{item.timestamp}</Text>
         </View>
@@ -273,7 +272,7 @@ export const DashboardScreen: React.FC = () => {
           <Icon name="warning" size={20} color={theme.warning} />
         </View>
         <View style={styles.lowStockContent}>
-          <Text style={styles.lowStockTitle}>{productName}</Text>
+          <Text style={styles.lowStockItemTitle}>{productName}</Text>
           <Text style={styles.lowStockDescription}>
             {quantity} units left • {locationName}
           </Text>
@@ -395,7 +394,7 @@ export const DashboardScreen: React.FC = () => {
     activityContent: {
       flex: 1,
     },
-    activityTitle: {
+    activityItemTitle: {
       fontSize: typography.fontSize.sm,
       fontWeight: typography.fontWeight.medium,
       color: theme.text,
@@ -447,7 +446,7 @@ export const DashboardScreen: React.FC = () => {
     lowStockContent: {
       flex: 1,
     },
-    lowStockTitle: {
+    lowStockItemTitle: {
       fontSize: typography.fontSize.sm,
       fontWeight: typography.fontWeight.medium,
       color: theme.text,

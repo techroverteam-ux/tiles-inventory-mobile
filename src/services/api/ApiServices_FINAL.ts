@@ -218,11 +218,9 @@ export interface SalesOrder {
   orderNumber: string
   customerId: string
   customerName: string
-  customerPhone?: string
   orderDate: string
-  deliveryDate?: string
   expectedDelivery?: string
-  status: 'DRAFT' | 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'
+  status: 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'
   totalAmount: number
   discount?: number
   items: SalesOrderItem[]
@@ -304,8 +302,7 @@ export interface Brand {
   name: string
   description?: string
   logo?: string
-  isActive?: boolean
-  createdAt: string
+  createdAt?: string
   updatedAt?: string
 }
 
@@ -366,8 +363,7 @@ export interface Category {
   name: string
   description?: string
   image?: string
-  isActive?: boolean
-  createdAt: string
+  createdAt?: string
   updatedAt?: string
 }
 
@@ -377,12 +373,9 @@ export interface CategoryResponse {
 }
 
 export const categoryService = {
-  getCategories: async (pageOrBrandId: number | string = 1, limit: number = 50): Promise<CategoryResponse> => {
+  getCategories: async (page: number = 1, limit: number = 50): Promise<CategoryResponse> => {
     try {
-      const params = typeof pageOrBrandId === 'string'
-        ? { brandId: pageOrBrandId }
-        : { page: pageOrBrandId, limit }
-      const response = await apiClient.get('/categories', { params })
+      const response = await apiClient.get('/categories', { params: { page, limit } })
       return response.data
     } catch (error) {
       console.error('Failed to fetch categories:', error)
@@ -428,81 +421,10 @@ export const categoryService = {
 
 export interface Size {
   id: string
-  name: string
-  label?: string
-  description?: string
+  label: string
   dimensions?: string
-  isActive?: boolean
-  createdAt: string
+  createdAt?: string
   updatedAt?: string
-}
-
-export interface Collection {
-  id: string
-  name: string
-  description?: string
-  image?: string
-  isActive?: boolean
-  createdAt: string
-  updatedAt?: string
-}
-
-export interface CollectionResponse {
-  collections: Collection[]
-  total: number
-}
-
-export const collectionService = {
-  getCollections: async (pageOrBrandId: number | string = 1, limitOrCategoryId?: number | string): Promise<CollectionResponse> => {
-    try {
-      const params = typeof pageOrBrandId === 'string'
-        ? {
-            brandId: pageOrBrandId,
-            ...(typeof limitOrCategoryId === 'string' ? { categoryId: limitOrCategoryId } : {}),
-          }
-        : { page: pageOrBrandId, limit: typeof limitOrCategoryId === 'number' ? limitOrCategoryId : 50 }
-      const response = await apiClient.get('/collections', { params })
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch collections:', error)
-      return { collections: [], total: 0 }
-    }
-  },
-
-  getCollection: async (id: string): Promise<Collection> => {
-    try {
-      const response = await apiClient.get(`/collections/${id}`)
-      return response.data
-    } catch (error) {
-      throw error
-    }
-  },
-
-  createCollection: async (data: Partial<Collection>): Promise<Collection> => {
-    try {
-      const response = await apiClient.post('/collections', data)
-      return response.data
-    } catch (error) {
-      throw error
-    }
-  },
-
-  updateCollection: async (id: string, data: Partial<Collection>): Promise<Collection> => {
-    try {
-      const response = await apiClient.put(`/collections/${id}`, data)
-      return response.data
-    } catch (error) {
-      throw error
-    }
-  },
-
-  deleteCollection: async (id: string): Promise<void> => {
-    try {
-      await apiClient.delete(`/collections/${id}`)
-    } catch (error) {
-      throw error
-    }
-  },
 }
 
 export interface SizeResponse {
@@ -511,15 +433,9 @@ export interface SizeResponse {
 }
 
 export const sizeService = {
-  getSizes: async (pageOrBrandId: number | string = 1, limitOrCategoryId?: number | string): Promise<SizeResponse> => {
+  getSizes: async (page: number = 1, limit: number = 50): Promise<SizeResponse> => {
     try {
-      const params = typeof pageOrBrandId === 'string'
-        ? {
-            brandId: pageOrBrandId,
-            ...(typeof limitOrCategoryId === 'string' ? { categoryId: limitOrCategoryId } : {}),
-          }
-        : { page: pageOrBrandId, limit: typeof limitOrCategoryId === 'number' ? limitOrCategoryId : 50 }
-      const response = await apiClient.get('/sizes', { params })
+      const response = await apiClient.get('/sizes', { params: { page, limit } })
       return response.data
     } catch (error) {
       console.error('Failed to fetch sizes:', error)
@@ -563,111 +479,12 @@ export const sizeService = {
   },
 }
 
-// ============ Notifications ============
-
-export interface Notification {
-  id: string
-  type: 'order' | 'inventory' | 'alert' | 'info' | 'warning' | 'success' | 'error'
-  title: string
-  message: string
-  isRead: boolean
-  read?: boolean
-  timestamp?: string
-  relatedEntity?: {
-    type: string
-    id: string
-  }
-  createdAt: string
-  updatedAt: string
-}
-
-export interface NotificationResponse {
-  notifications: Notification[]
-  total: number
-}
-
-export const notificationService = {
-  getNotifications: async (page = 1, limit = 20): Promise<NotificationResponse> => {
-    try {
-      const response = await apiClient.get('/notifications', { params: { page, limit } })
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error)
-      return { notifications: [], total: 0 }
-    }
-  },
-
-  getNotification: async (id: string): Promise<Notification> => {
-    try {
-      const response = await apiClient.get(`/notifications/${id}`)
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch notification:', error)
-      throw error
-    }
-  },
-
-  markAsRead: async (id: string): Promise<Notification> => {
-    try {
-      const response = await apiClient.patch(`/notifications/${id}/read`, {})
-      return response.data
-    } catch (error) {
-      console.error('Failed to mark notification as read:', error)
-      throw error
-    }
-  },
-
-  markAsUnread: async (id: string): Promise<Notification> => {
-    try {
-      const response = await apiClient.patch(`/notifications/${id}/unread`, {})
-      return response.data
-    } catch (error) {
-      console.error('Failed to mark notification as unread:', error)
-      throw error
-    }
-  },
-
-  markAllAsRead: async (): Promise<{ success: boolean }> => {
-    try {
-      const response = await apiClient.patch('/notifications/read-all', {})
-      return response.data
-    } catch (error) {
-      console.error('Failed to mark all notifications as read:', error)
-      throw error
-    }
-  },
-
-  markAllRead: async (): Promise<{ success: boolean }> => {
-    return notificationService.markAllAsRead()
-  },
-
-  deleteNotification: async (id: string): Promise<void> => {
-    try {
-      await apiClient.delete(`/notifications/${id}`)
-    } catch (error) {
-      console.error('Failed to delete notification:', error)
-      throw error
-    }
-  },
-
-  clearAll: async (): Promise<{ success: boolean }> => {
-    try {
-      const response = await apiClient.delete('/notifications/clear-all')
-      return response.data
-    } catch (error) {
-      console.error('Failed to clear all notifications:', error)
-      throw error
-    }
-  },
-}
-
 export interface Location {
   id: string
   name: string
   address?: string
   code?: string
-  isActive?: boolean
-  createdAt: string
+  createdAt?: string
   updatedAt?: string
 }
 
@@ -718,239 +535,6 @@ export const locationService = {
     try {
       await apiClient.delete(`/locations/${id}`)
     } catch (error) {
-      throw error
-    }
-  },
-}
-
-// ============ Products ============
-
-export interface Product {
-  id: string
-  name: string
-  code: string
-  description?: string
-  brand: { id: string; name: string }
-  category: { id: string; name: string }
-  collection?: { id: string; name: string }
-  size?: { id: string; name: string }
-  finishType?: { id: string; name: string }
-  length?: number
-  width?: number
-  thickness?: number
-  sqftPerBox?: number
-  pcsPerBox?: number
-  stock?: number
-  isActive?: boolean
-  imageUrl?: string
-  createdAt?: string
-  updatedAt?: string
-}
-
-export interface ProductResponse {
-  products: Product[]
-  total: number
-}
-
-export interface FinishType {
-  id: string
-  name: string
-  isActive?: boolean
-}
-
-export interface FinishTypeResponse {
-  finishTypes: FinishType[]
-  total: number
-}
-
-export interface CreateProductRequest {
-  name: string
-  code: string
-  description?: string
-  brandId: string
-  categoryId: string
-  collectionId?: string
-  sizeId?: string
-  finishTypeId?: string
-  length?: number
-  width?: number
-  thickness?: number
-  sqftPerBox?: number
-  pcsPerBox?: number
-  locationId?: string
-  batchName?: string
-  stock?: number
-  image?: any
-}
-
-export const productService = {
-  getProducts: async (page: number = 1, limit: number = 50): Promise<ProductResponse> => {
-    try {
-      const response = await apiClient.get('/products', { params: { page, limit } })
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch products:', error)
-      return { products: [], total: 0 }
-    }
-  },
-
-  getProduct: async (id: string): Promise<Product> => {
-    const response = await apiClient.get(`/products/${id}`)
-    return response.data
-  },
-
-  createProduct: async (data: CreateProductRequest): Promise<Product> => {
-    const response = await apiClient.post('/products', data)
-    return response.data
-  },
-
-  updateProduct: async (id: string, data: CreateProductRequest): Promise<Product> => {
-    const response = await apiClient.put(`/products/${id}`, data)
-    return response.data
-  },
-
-  deleteProduct: async (id: string): Promise<void> => {
-    await apiClient.delete(`/products/${id}`)
-  },
-}
-
-export const finishTypeService = {
-  getFinishTypes: async (): Promise<FinishTypeResponse> => {
-    try {
-      const response = await apiClient.get('/finish-types')
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch finish types:', error)
-      return { finishTypes: [], total: 0 }
-    }
-  },
-}
-
-export interface DashboardStats {
-  totalProducts: number
-  monthlySales: number
-  purchaseOrders: number
-  lowStockItems: number
-}
-
-export interface SalesData {
-  month: string
-  amount: number
-}
-
-export interface Batch {
-  id: string
-  productId: string
-  batchNumber: string
-  quantity: number
-  purchasePrice?: number
-  sellingPrice?: number
-  shade?: string
-  expiryDate?: string
-  updatedAt: string
-  product: {
-    id: string
-    name: string
-    code: string
-    imageUrl?: string
-    brand: { id: string; name: string }
-    category: { id: string; name: string }
-  }
-  location: {
-    id: string
-    name: string
-  }
-}
-
-export interface InventoryFilters {
-  page?: number
-  limit?: number
-  search?: string
-  sortBy?: string
-  sortOrder?: 'asc' | 'desc'
-}
-
-export interface EnquiryRequest {
-  productId: string
-  name: string
-  email: string
-  phone: string
-  quantity?: number
-  message?: string
-}
-
-export const dashboardService = {
-  getStats: async (): Promise<DashboardStats> => {
-    try {
-      const response = await apiClient.get('/dashboard/stats')
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch dashboard stats:', error)
-      return {
-        totalProducts: 0,
-        monthlySales: 0,
-        purchaseOrders: 0,
-        lowStockItems: 0,
-      }
-    }
-  },
-
-  getSalesData: async (): Promise<SalesData[]> => {
-    try {
-      const response = await apiClient.get('/dashboard/sales-data')
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch dashboard sales data:', error)
-      return []
-    }
-  },
-
-  getRecentOrders: async (): Promise<any[]> => {
-    try {
-      const response = await apiClient.get('/dashboard/recent-orders')
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch recent orders:', error)
-      return []
-    }
-  },
-
-  getLowStockItems: async (): Promise<any[]> => {
-    try {
-      const response = await apiClient.get('/dashboard/low-stock-items')
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch low stock items:', error)
-      return []
-    }
-  },
-}
-
-export const inventoryService = {
-  getInventory: async (filters: InventoryFilters = {}): Promise<{
-    inventory: Batch[]
-    pagination: { page: number; pages: number; total: number }
-  }> => {
-    try {
-      const response = await apiClient.get('/inventory', { params: filters })
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch inventory:', error)
-      return {
-        inventory: [],
-        pagination: { page: filters.page || 1, pages: 1, total: 0 },
-      }
-    }
-  },
-}
-
-export const enquiryService = {
-  submitEnquiry: async (data: EnquiryRequest): Promise<{ success: boolean }> => {
-    try {
-      const response = await apiClient.post('/enquiries', data)
-      return response.data
-    } catch (error) {
-      console.error('Failed to submit enquiry:', error)
       throw error
     }
   },

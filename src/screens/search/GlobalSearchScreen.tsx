@@ -165,6 +165,11 @@ export const GlobalSearchScreen: React.FC<GlobalSearchScreenProps> = ({ navigati
     try {
       setLoading(true)
       const response = await globalSearchService.search(searchQuery)
+      
+      if (response.results.length === 0) {
+        showToast('No results found', 'warning')
+      }
+      
       setResults(response.results)
       
       // Add to recent searches
@@ -173,7 +178,8 @@ export const GlobalSearchScreen: React.FC<GlobalSearchScreenProps> = ({ navigati
         return updated.slice(0, 5) // Keep only 5 recent searches
       })
     } catch (error) {
-      showToast('Search failed', 'error')
+      console.error('Search error:', error)
+      showToast('Search failed. Please try again.', 'error')
       setResults([])
     } finally {
       setLoading(false)
@@ -181,8 +187,61 @@ export const GlobalSearchScreen: React.FC<GlobalSearchScreenProps> = ({ navigati
   }
 
   const handleResultPress = (result: GlobalSearchResult) => {
-    // TODO: Navigate to the specific screen based on result.href
-    showToast(`Navigate to ${result.label}`, 'info')
+    try {
+      const type = result.type?.toLowerCase() || ''
+      const id = result.id
+
+      switch (type) {
+        case 'product':
+          navigation.navigate('Products', {
+            screen: 'ProductDetail',
+            params: { productId: id }
+          })
+          break
+        case 'brand':
+          navigation.navigate('Products', {
+            screen: 'BrandDetail',
+            params: { brandId: id }
+          })
+          break
+        case 'category':
+          navigation.navigate('Products', {
+            screen: 'CategoryDetail',
+            params: { categoryId: id }
+          })
+          break
+        case 'customer':
+          navigation.navigate('Customers', {
+            screen: 'CustomerDetail',
+            params: { customerId: id }
+          })
+          break
+        case 'order':
+        case 'purchaseorder':
+          navigation.navigate('PurchaseOrders', {
+            screen: 'PurchaseOrderDetail',
+            params: { orderId: id, orderType: 'purchase' }
+          })
+          break
+        case 'salesorder':
+          navigation.navigate('SalesOrders', {
+            screen: 'SalesOrderDetail',
+            params: { orderId: id, orderType: 'sales' }
+          })
+          break
+        case 'location':
+          showToast('Location details', 'info')
+          break
+        case 'collection':
+          navigation.navigate('CollectionManagement')
+          break
+        default:
+          showToast(`Navigate to ${result.label}`, 'info')
+      }
+    } catch (error) {
+      console.error('Navigation error:', error)
+      showToast('Unable to navigate', 'error')
+    }
   }
 
   const handleRecentSearchPress = (searchQuery: string) => {
@@ -207,6 +266,8 @@ export const GlobalSearchScreen: React.FC<GlobalSearchScreenProps> = ({ navigati
       case 'collection': return 'collections'
       case 'customer': return 'person'
       case 'order': return 'receipt'
+      case 'purchaseorder': return 'shopping-cart'
+      case 'salesorder': return 'local-shipping'
       case 'location': return 'place'
       default: return 'search'
     }

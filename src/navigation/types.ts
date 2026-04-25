@@ -59,6 +59,7 @@ export type DrawerParamList = {
   GlobalSearch: undefined
   Reports: undefined
   Settings: undefined
+  AdminPanel: undefined
   AdminFunctions: undefined
 }
 
@@ -78,17 +79,19 @@ export type InventoryStackParamList = {
 // Orders Stack Params
 export type OrdersStackParamList = {
   OrderList: undefined
-  OrderDetail: { orderId: string }
+  OrderDetail: { orderId: string; orderType?: 'purchase' | 'sales' }
   PurchaseOrderList: undefined
-  PurchaseOrderDetail: { orderId: string }
+  PurchaseOrderDetail: { orderId: string; orderType?: 'purchase' | 'sales' }
   SalesOrderList: undefined
-  SalesOrderDetail: { orderId: string }
+  SalesOrderDetail: { orderId: string; orderType?: 'purchase' | 'sales' }
 }
 
 // Products Stack Params
 export type ProductsStackParamList = {
   ProductList: undefined
   ProductDetail: { productId: string }
+  BrandDetail: { brandId: string }
+  CategoryDetail: { categoryId: string }
 }
 
 // Customers Stack Params

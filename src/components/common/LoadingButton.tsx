@@ -4,6 +4,7 @@ import {
   Text,
   ActivityIndicator,
   StyleSheet,
+  StyleProp,
   ViewStyle,
   TextStyle
 } from 'react-native'
@@ -17,8 +18,8 @@ interface LoadingButtonProps {
   disabled?: boolean
   variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'success'
   size?: 'small' | 'medium' | 'large'
-  style?: ViewStyle
-  textStyle?: TextStyle
+  style?: StyleProp<ViewStyle>
+  textStyle?: StyleProp<TextStyle>
   loadingColor?: string
   icon?: React.ReactNode
   fullWidth?: boolean

@@ -13,13 +13,16 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
+import { useToast } from '../../context/ToastContext'
 import { TextInput } from '../../components/common/TextInput'
 import { LoadingButton } from '../../components/common/LoadingButton'
 import { Card } from '../../components/common/Card'
+import { authService } from '../../services/api/ApiServices'
 import { spacing, typography } from '../../theme'
 
 export const ForgotPasswordScreen: React.FC = () => {
   const { theme } = useTheme()
+  const { showToast } = useToast()
   const navigation = useNavigation()
   
   const [email, setEmail] = useState('')
@@ -28,17 +31,29 @@ export const ForgotPasswordScreen: React.FC = () => {
 
   const handleResetPassword = async () => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address')
+      showToast('Please enter your email address', 'warning')
+      return
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      showToast('Please enter a valid email address', 'warning')
       return
     }
 
     setLoading(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setEmailSent(true)
+      const response = await authService.forgotPassword(email)
+      if (response.success) {
+        setEmailSent(true)
+        showToast('Password reset link sent to your email', 'success')
+      } else {
+        showToast(response.message || 'Failed to send reset email', 'error')
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to send reset email. Please try again.')
+      console.error('Forgot password error:', error)
+      showToast('Failed to send reset email. Please try again.', 'error')
     } finally {
       setLoading(false)
     }

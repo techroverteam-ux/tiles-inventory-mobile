@@ -99,7 +99,7 @@ export const EnhancedDashboardScreen: React.FC = () => {
     try {
       setLoading(true)
       // Simulate API calls - replace with actual API endpoints
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
       
       // Mock data - replace with actual API responses
       setStats({

@@ -26,7 +26,10 @@ interface ToastMessage {
 }
 
 interface ToastContextType {
-  showToast: (toast: Omit<ToastMessage, 'id'>) => void
+  showToast: {
+    (toast: Omit<ToastMessage, 'id'>): void
+    (title: string, type?: ToastType): void
+  }
   showSuccess: (title: string, message?: string, options?: { action?: ToastMessage['action'] }) => void
   showError: (title: string, message?: string, options?: { action?: ToastMessage['action'] }) => void
   showWarning: (title: string, message?: string, options?: { action?: ToastMessage['action'] }) => void
@@ -231,10 +234,17 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
 
-  const showToast = useCallback((toast: Omit<ToastMessage, 'id'>) => {
+  const showToast = useCallback((
+    toastOrTitle: Omit<ToastMessage, 'id'> | string,
+    legacyType: ToastType = 'info'
+  ) => {
     const id = Date.now().toString()
-    const newToast: ToastMessage = { ...toast, id }
-    
+    const payload: Omit<ToastMessage, 'id'> =
+      typeof toastOrTitle === 'string'
+        ? { type: legacyType, title: toastOrTitle }
+        : toastOrTitle
+
+    const newToast: ToastMessage = { ...payload, id }
     setToasts(prev => [newToast, ...prev.slice(0, 2)]) // Keep max 3 toasts
   }, [])
 
