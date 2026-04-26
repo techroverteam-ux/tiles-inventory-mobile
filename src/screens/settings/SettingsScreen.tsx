@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Switch,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
@@ -18,6 +17,7 @@ import { Card } from '../../components/common/Card'
 import { TextInput } from '../../components/common/TextInput'
 import { LoadingButton } from '../../components/common/LoadingButton'
 import { spacing, typography, borderRadius } from '../../theme'
+import { withOpacity } from '../../utils/colorUtils'
 
 interface SettingsScreenProps {
   navigation: any
@@ -92,7 +92,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
       disabled={!onPress}
     >
       <View style={styles.settingsItemLeft}>
-        <View style={[styles.settingsIcon, { backgroundColor: (color || theme.primary) + '20' }]}>
+        <View style={[styles.settingsIcon, { backgroundColor: withOpacity(color || theme.primary, 0.12) }]}>
           <Icon name={icon} size={20} color={color || theme.primary} />
         </View>
         <View style={styles.settingsText}>
@@ -204,9 +204,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
       marginBottom: spacing.base,
     },
     dangerZone: {
-      borderColor: theme.error + '30',
+      borderColor: withOpacity(theme.error, 0.3),
       borderWidth: 1,
-      backgroundColor: theme.error + '05',
+      backgroundColor: withOpacity(theme.error, 0.05),
     },
   })
 
@@ -270,17 +270,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
         {/* App Settings */}
         <SettingsSection title="App Settings">
           <SettingsItem
-            icon="dark-mode"
+            icon={isDark ? 'wb-sunny' : 'nightlight-round'}
             title="Dark Mode"
             subtitle={isDark ? 'Dark theme enabled' : 'Light theme enabled'}
-            rightComponent={
-              <Switch
-                value={isDark}
-                onValueChange={toggleTheme}
-                trackColor={{ false: theme.border, true: theme.primary + '50' }}
-                thumbColor={isDark ? theme.primary : theme.textSecondary}
-              />
-            }
+            onPress={toggleTheme}
             showArrow={false}
           />
           <SettingsItem
@@ -307,7 +300,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
             color={theme.info}
           />
           <SettingsItem
-            icon="category"
+            icon="palette"
             title="Category Management"
             subtitle="Organize product categories"
             onPress={() => navigation.navigate('CategoryManagement')}
@@ -332,7 +325,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
         {/* Reports & Analytics */}
         <SettingsSection title="Reports & Analytics">
           <SettingsItem
-            icon="assessment"
+            icon="description"
             title="Reports"
             subtitle="View detailed reports"
             onPress={() => navigation.navigate('Reports')}

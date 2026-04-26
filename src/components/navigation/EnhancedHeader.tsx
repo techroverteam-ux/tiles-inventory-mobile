@@ -1,5 +1,5 @@
 import React from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Switch } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
 import { useSession } from '../../context/SessionContext'
@@ -92,8 +92,7 @@ export const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.xs,
-    },
-    iconButton: {
+    },    iconButton: {
       padding: spacing.sm,
     },
     avatar: {
@@ -146,16 +145,12 @@ export const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
           <>
             {/* Theme Toggle */}
             {showThemeToggle && (
-              <View style={styles.themeToggle}>
-                <Icon name={isDark ? 'light-mode' : 'dark-mode'} size={18} color={theme.text} />
-                <Switch
-                  value={isDark}
-                  onValueChange={toggleTheme}
-                  trackColor={{ false: theme.border, true: theme.primary + '50' }}
-                  thumbColor={isDark ? theme.primary : theme.textSecondary}
-                  style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                />
-              </View>
+              <TouchableOpacity
+                onPress={toggleTheme}
+                style={styles.iconButton}
+              >
+                <Icon name={isDark ? 'wb-sunny' : 'nightlight-round'} size={22} color={theme.text} />
+              </TouchableOpacity>
             )}
 
             {/* Export Button */}

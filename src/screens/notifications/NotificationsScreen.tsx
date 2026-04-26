@@ -17,6 +17,7 @@ import { Header } from '../../components/navigation/Header'
 import { LoadingSpinner } from '../../components/loading'
 import { notificationService, Notification } from '../../services/api/ApiServices'
 import { spacing, typography, borderRadius } from '../../theme'
+import { withOpacity } from '../../utils/colorUtils'
 
 interface NotificationsScreenProps {
   navigation: any
@@ -55,10 +56,10 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
       padding: spacing.sm,
       marginLeft: spacing.xs,
       borderRadius: borderRadius.sm,
-      backgroundColor: theme.primary + '20',
+      backgroundColor: withOpacity(theme.primary, 0.12),
     },
     clearButton: {
-      backgroundColor: theme.error + '20',
+      backgroundColor: withOpacity(theme.error, 0.12),
     },
     listContainer: {
       flex: 1,
@@ -113,16 +114,16 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
       borderRadius: borderRadius.sm,
     },
     infoBadge: {
-      backgroundColor: theme.info + '20',
+      backgroundColor: withOpacity(theme.info, 0.12),
     },
     successBadge: {
-      backgroundColor: theme.success + '20',
+      backgroundColor: withOpacity(theme.success, 0.12),
     },
     warningBadge: {
-      backgroundColor: theme.warning + '20',
+      backgroundColor: withOpacity(theme.warning, 0.12),
     },
     errorBadge: {
-      backgroundColor: theme.error + '20',
+      backgroundColor: withOpacity(theme.error, 0.12),
     },
     typeText: {
       fontSize: typography.fontSize.xs,
@@ -305,14 +306,12 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             {/* Theme Toggle */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <Icon name={isDark ? 'light-mode' : 'dark-mode'} size={18} color={theme.text} />
-              <Switch
-                value={isDark}
-                onValueChange={toggleTheme}
-                trackColor={{ false: theme.border, true: theme.primary + '50' }}
-                thumbColor={isDark ? theme.primary : theme.textSecondary}
-                style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-              />
+            <TouchableOpacity
+              onPress={toggleTheme}
+              style={{ padding: spacing.sm }}
+            >
+              <Icon name={isDark ? 'wb-sunny' : 'nightlight-round'} size={22} color={theme.text} />
+            </TouchableOpacity>
             </View>
             
             {/* Action Buttons */}

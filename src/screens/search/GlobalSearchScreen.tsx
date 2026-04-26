@@ -7,7 +7,6 @@ import {
   FlatList,
   TouchableOpacity,
   Keyboard,
-  Switch,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
@@ -17,6 +16,7 @@ import { Header } from '../../components/navigation/Header'
 import { LoadingSpinner } from '../../components/loading'
 import { globalSearchService, GlobalSearchResult } from '../../services/api/ApiServices'
 import { spacing, typography, borderRadius } from '../../theme'
+import { withOpacity } from '../../utils/colorUtils'
 
 interface GlobalSearchScreenProps {
   navigation: any
@@ -92,7 +92,7 @@ export const GlobalSearchScreen: React.FC<GlobalSearchScreenProps> = ({ navigati
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: theme.primary + '20',
+      backgroundColor: withOpacity(theme.primary, 0.12),
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: spacing.base,
@@ -319,16 +319,9 @@ export const GlobalSearchScreen: React.FC<GlobalSearchScreenProps> = ({ navigati
         showBack
         navigation={navigation}
         rightComponent={
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            <Icon name={isDark ? 'light-mode' : 'dark-mode'} size={18} color={theme.text} />
-            <Switch
-              value={isDark}
-              onValueChange={toggleTheme}
-              trackColor={{ false: theme.border, true: theme.primary + '50' }}
-              thumbColor={isDark ? theme.primary : theme.textSecondary}
-              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-            />
-          </View>
+          <TouchableOpacity onPress={toggleTheme} style={{ padding: spacing.sm }}>
+            <Icon name={isDark ? 'wb-sunny' : 'nightlight-round'} size={22} color={theme.text} />
+          </TouchableOpacity>
         }
       />
       <View style={styles.searchContainer}>

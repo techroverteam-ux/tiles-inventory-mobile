@@ -37,7 +37,7 @@ const navigationItems: NavigationItem[] = [
   {
     name: 'Products',
     label: 'Products',
-    icon: 'inventory',
+    icon: 'inventory-2',
     children: [
       { name: 'ProductList', label: 'All Products', icon: 'list' },
       { name: 'ProductForm', label: 'Add Product', icon: 'add' },
@@ -46,7 +46,7 @@ const navigationItems: NavigationItem[] = [
   {
     name: 'Inventory',
     label: 'Inventory',
-    icon: 'warehouse',
+    icon: 'layers',
   },
   {
     name: 'Orders',
@@ -54,16 +54,16 @@ const navigationItems: NavigationItem[] = [
     icon: 'receipt',
     children: [
       { name: 'PurchaseOrders', label: 'Purchase Orders', icon: 'shopping-cart' },
-      { name: 'SalesOrders', label: 'Sales Orders', icon: 'point-of-sale' },
+      { name: 'SalesOrders', label: 'Sales Orders', icon: 'trending-up' },
     ],
   },
   {
     name: 'Management',
     label: 'Management',
-    icon: 'settings',
+    icon: 'tune',
     children: [
-      { name: 'BrandManagement', label: 'Brands', icon: 'business' },
-      { name: 'CategoryManagement', label: 'Categories', icon: 'category' },
+      { name: 'BrandManagement', label: 'Brands', icon: 'people' },
+      { name: 'CategoryManagement', label: 'Categories', icon: 'palette' },
       { name: 'CollectionManagement', label: 'Collections', icon: 'collections' },
       { name: 'SizeManagement', label: 'Sizes', icon: 'straighten' },
       { name: 'LocationManagement', label: 'Locations', icon: 'location-on' },
@@ -77,13 +77,13 @@ const navigationItems: NavigationItem[] = [
   {
     name: 'Reports',
     label: 'Reports',
-    icon: 'analytics',
+    icon: 'description',
   },
   {
     name: 'Notifications',
     label: 'Notifications',
     icon: 'notifications',
-    badge: 3, // This would come from context
+    badge: 3,
   },
   {
     name: 'AdminPanel',

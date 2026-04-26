@@ -1,8 +1,10 @@
 import React from 'react'
+import { View } from 'react-native'
 import { createStackNavigator } from '@react-navigation/stack'
 import { createDrawerNavigator } from '@react-navigation/drawer'
 import { useTheme } from '../context/ThemeContext'
 import { CustomDrawerContent } from '../components/navigation/CustomDrawerContent'
+import { BottomNavBar } from '../components/navigation/BottomNavBar'
 import { DashboardStack } from './stacks/DashboardStack'
 import { InventoryStack } from './stacks/InventoryStack'
 import { ProductsStack } from './stacks/ProductsStack'
@@ -37,37 +39,40 @@ const DrawerNavigator: React.FC = () => {
   const { theme } = useTheme()
 
   return (
-    <Drawer.Navigator
-      id="MainDrawer"
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
-      screenOptions={{
-        headerShown: false,
-        drawerStyle: {
-          backgroundColor: theme.surface,
-          width: 280,
-        },
-        drawerType: 'front',
-        overlayColor: 'rgba(0, 0, 0, 0.5)',
-      }}
-    >
-      <Drawer.Screen name="Dashboard" component={EnhancedDashboardScreen} />
-      <Drawer.Screen name="GlobalSearch" component={GlobalSearchScreen} />
-      <Drawer.Screen name="BrandManagement" component={BrandManagementScreen} />
-      <Drawer.Screen name="CategoryManagement" component={CategoryManagementScreen} />
-      <Drawer.Screen name="CollectionManagement" component={CollectionManagementScreen} />
-      <Drawer.Screen name="SizeManagement" component={SizeManagementScreen} />
-      <Drawer.Screen name="Products" component={ProductsStack} />
-      <Drawer.Screen name="Inventory" component={InventoryStack} />
-      <Drawer.Screen name="LocationManagement" component={LocationManagementScreen} />
-      <Drawer.Screen name="PurchaseOrders" component={OrdersStack} />
-      <Drawer.Screen name="SalesOrders" component={OrdersStack} />
-      <Drawer.Screen name="Customers" component={CustomersStack} />
-      <Drawer.Screen name="Notifications" component={NotificationsScreen} />
-      <Drawer.Screen name="Reports" component={ReportsScreen} />
-      <Drawer.Screen name="AdminPanel" component={AdminPanelScreen} />
-      <Drawer.Screen name="AdminFunctions" component={AdminFunctionsScreen} />
-      <Drawer.Screen name="Settings" component={SettingsScreen} />
-    </Drawer.Navigator>
+    <View style={{ flex: 1 }}>
+      <Drawer.Navigator
+        id="MainDrawer"
+        drawerContent={(props) => <CustomDrawerContent {...props} />}
+        screenOptions={{
+          headerShown: false,
+          drawerStyle: {
+            backgroundColor: theme.surface,
+            width: 280,
+          },
+          drawerType: 'front',
+          overlayColor: 'rgba(0, 0, 0, 0.5)',
+        }}
+      >
+        <Drawer.Screen name="Dashboard" component={EnhancedDashboardScreen} />
+        <Drawer.Screen name="GlobalSearch" component={GlobalSearchScreen} />
+        <Drawer.Screen name="BrandManagement" component={BrandManagementScreen} />
+        <Drawer.Screen name="CategoryManagement" component={CategoryManagementScreen} />
+        <Drawer.Screen name="CollectionManagement" component={CollectionManagementScreen} />
+        <Drawer.Screen name="SizeManagement" component={SizeManagementScreen} />
+        <Drawer.Screen name="Products" component={ProductsStack} />
+        <Drawer.Screen name="Inventory" component={InventoryStack} />
+        <Drawer.Screen name="LocationManagement" component={LocationManagementScreen} />
+        <Drawer.Screen name="PurchaseOrders" component={OrdersStack} />
+        <Drawer.Screen name="SalesOrders" component={OrdersStack} />
+        <Drawer.Screen name="Customers" component={CustomersStack} />
+        <Drawer.Screen name="Notifications" component={NotificationsScreen} />
+        <Drawer.Screen name="Reports" component={ReportsScreen} />
+        <Drawer.Screen name="AdminPanel" component={AdminPanelScreen} />
+        <Drawer.Screen name="AdminFunctions" component={AdminFunctionsScreen} />
+        <Drawer.Screen name="Settings" component={SettingsScreen} />
+      </Drawer.Navigator>
+      <BottomNavBar />
+    </View>
   )
 }
 

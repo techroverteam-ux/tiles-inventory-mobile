@@ -17,6 +17,7 @@ import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { purchaseOrderService, PurchaseOrder } from '../../services/api/ApiServices'
 import { spacing, typography } from '../../theme'
+import { withOpacity } from '../../utils/colorUtils'
 
 interface PurchaseOrderListScreenProps {
   navigation: any
@@ -102,7 +103,7 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
             </Text>
           </View>
           <View style={styles.orderStatus}>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+            <View style={[styles.statusBadge, { backgroundColor: withOpacity(getStatusColor(item.status), 0.12) }]}>
               <Icon 
                 name={getStatusIcon(item.status)} 
                 size={14} 

@@ -6,7 +6,6 @@ import {
   TextInput,
   StyleSheet,
   StatusBar,
-  Platform,
   Modal,
   FlatList,
   ActivityIndicator,
@@ -160,7 +159,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                 activeOpacity={0.7}
               >
                 <Icon 
-                  name={isDark ? 'light-mode' : 'dark-mode'} 
+                  name={isDark ? 'wb-sunny' : 'nightlight-round'} 
                   size={22} 
                   color={theme.text} 
                 />

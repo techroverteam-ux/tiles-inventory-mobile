@@ -17,6 +17,7 @@ import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { salesOrderService, SalesOrder } from '../../services/api/ApiServices'
 import { spacing, typography } from '../../theme'
+import { withOpacity } from '../../utils/colorUtils'
 
 interface SalesOrderListScreenProps {
   navigation: any
@@ -92,7 +93,7 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
             </Text>
           </View>
           <View style={styles.orderStatus}>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+            <View style={[styles.statusBadge, { backgroundColor: withOpacity(getStatusColor(item.status), 0.12) }]}>
               <Icon 
                 name={getStatusIcon(item.status)} 
                 size={14} 

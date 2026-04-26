@@ -18,6 +18,7 @@ import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { categoryService, Category } from '../../services/api/ApiServices'
 import { spacing, typography } from '../../theme'
+import { withOpacity } from '../../utils/colorUtils'
 
 interface CategoryManagementScreenProps {
   navigation: any
@@ -132,13 +133,13 @@ export const CategoryManagementScreen: React.FC<CategoryManagementScreenProps> =
         </View>
         <View style={styles.categoryActions}>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.primary + '20' }]}
+            style={[styles.actionButton, { backgroundColor: withOpacity(theme.primary, 0.12) }]}
             onPress={() => handleEdit(item)}
           >
-            <Icon name="pencil" size={16} color={theme.primary} />
+            <Icon name="edit" size={16} color={theme.primary} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.error + '20' }]}
+            style={[styles.actionButton, { backgroundColor: withOpacity(theme.error, 0.12) }]}
             onPress={() => handleDelete(item)}
           >
             <Icon name="delete" size={16} color={theme.error} />
@@ -146,7 +147,7 @@ export const CategoryManagementScreen: React.FC<CategoryManagementScreenProps> =
         </View>
       </View>
       <View style={[styles.statusBadge, { 
-        backgroundColor: item.isActive ? theme.success + '20' : theme.error + '20' 
+        backgroundColor: item.isActive ? withOpacity(theme.success, 0.12) : withOpacity(theme.error, 0.12)
       }]}>
         <Text style={[styles.statusText, { 
           color: item.isActive ? theme.success : theme.error 

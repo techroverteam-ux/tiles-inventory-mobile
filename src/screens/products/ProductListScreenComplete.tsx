@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
-  Switch,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
@@ -20,6 +19,7 @@ import { ImagePreview } from '../../components/common/ImagePreview'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { productService, Product } from '../../services/api/ApiServices'
 import { spacing, typography, borderRadius } from '../../theme'
+import { withOpacity } from '../../utils/colorUtils'
 
 interface ProductListScreenProps {
   navigation: any
@@ -136,13 +136,13 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
         
         <View style={styles.productActions}>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.primary + '20' }]}
+            style={[styles.actionButton, { backgroundColor: withOpacity(theme.primary, 0.12) }]}
             onPress={() => navigation.navigate('ProductForm', { product: item })}
           >
             <Icon name="edit" size={16} color={theme.primary} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.error + '20' }]}
+            style={[styles.actionButton, { backgroundColor: withOpacity(theme.error, 0.12) }]}
             onPress={() => handleDeleteProduct(item)}
           >
             <Icon name="delete" size={16} color={theme.error} />
@@ -297,23 +297,12 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
         navigation={navigation}
         rightComponent={
           <View style={styles.headerActions}>
-            {/* Theme Toggle */}
-            <View style={styles.themeToggle}>
-              <Icon name={isDark ? 'light-mode' : 'dark-mode'} size={20} color={theme.text} />
-              <Switch
-                value={isDark}
-                onValueChange={toggleTheme}
-                trackColor={{ false: theme.border, true: theme.primary + '50' }}
-                thumbColor={isDark ? theme.primary : theme.textSecondary}
-              />
-            </View>
-            
-            {/* Export Button */}
+            <TouchableOpacity onPress={toggleTheme} style={{ padding: 4 }}>
+              <Icon name={isDark ? 'wb-sunny' : 'nightlight-round'} size={22} color={theme.text} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleExport}>
               <Icon name="download" size={24} color={theme.text} />
             </TouchableOpacity>
-            
-            {/* Add Button */}
             <TouchableOpacity onPress={() => navigation.navigate('ProductForm')}>
               <Icon name="add" size={24} color={theme.text} />
             </TouchableOpacity>
