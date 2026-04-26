@@ -15,6 +15,7 @@ export const ProductsStack: React.FC = () => {
 
   return (
     <Stack.Navigator
+      id="ProductsStack"
       screenOptions={{
         headerStyle: {
           backgroundColor: theme.surface,

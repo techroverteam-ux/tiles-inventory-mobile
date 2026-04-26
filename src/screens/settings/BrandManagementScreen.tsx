@@ -133,16 +133,16 @@ export const BrandManagementScreen: React.FC<BrandManagementScreenProps> = ({ na
         </View>
         <View style={styles.brandActions}>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: withOpacity(theme.primary, 0.12) }]}
+            style={[styles.actionButton, { backgroundColor: theme.primary }]}
             onPress={() => handleEdit(item)}
           >
-            <Icon name="edit" size={16} color={theme.primary} />
+            <Icon name="edit" size={16} color="#ffffff" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: withOpacity(theme.error, 0.12) }]}
+            style={[styles.actionButton, { backgroundColor: theme.error }]}
             onPress={() => handleDelete(item)}
           >
-            <Icon name="delete" size={16} color={theme.error} />
+            <Icon name="delete" size={16} color="#ffffff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -326,7 +326,7 @@ export const BrandManagementScreen: React.FC<BrandManagementScreenProps> = ({ na
           ListEmptyComponent={
             !loading ? (
               <View style={styles.emptyContainer}>
-                <Icon name="tag-multiple" size={64} color={theme.textSecondary} />
+                <Icon name="label" size={64} color={theme.textSecondary} />
                 <Text style={styles.emptyText}>No brands available</Text>
               </View>
             ) : null
@@ -339,7 +339,7 @@ export const BrandManagementScreen: React.FC<BrandManagementScreenProps> = ({ na
           style={styles.fab}
           onPress={() => setShowAddForm(true)}
         >
-          <Icon name="plus" size={24} color={theme.textInverse} />
+          <Icon name="add" size={24} color={theme.textInverse} />
         </TouchableOpacity>
       )}
     </SafeAreaView>

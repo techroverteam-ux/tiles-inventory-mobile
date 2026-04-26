@@ -39,6 +39,7 @@ export type MainStackParamList = {
   Notifications: undefined
   GlobalSearch: undefined
   EnquiryForm: { productId?: string; productName?: string }
+  AdminPanel: undefined
   AdminFunctions: undefined
 }
 

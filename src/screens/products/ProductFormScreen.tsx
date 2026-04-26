@@ -15,6 +15,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { Card } from '../../components/common/Card'
 import { TextInput } from '../../components/common/TextInput'
 import { LoadingButton } from '../../components/common/LoadingButton'
+import { SelectModal } from '../../components/common/SelectModal'
 import { spacing, typography, borderRadius } from '../../theme'
 import { MainStackParamList } from '../../navigation/types'
 import {
@@ -284,49 +285,6 @@ export const ProductFormScreen: React.FC = () => {
     }
   }
 
-  const renderDropdown = (
-    label: string,
-    value: string,
-    options: Array<{ id: string; name: string }>,
-    onSelect: (value: string) => void,
-    placeholder: string,
-    required = false,
-    disabled = false
-  ) => (
-    <View style={styles.formGroup}>
-      <Text style={styles.label}>
-        {label} {required && <Text style={styles.required}>*</Text>}
-      </Text>
-      <TouchableOpacity
-        style={[
-          styles.dropdown,
-          disabled && styles.dropdownDisabled,
-          errors[label.toLowerCase().replace(' ', '')] && styles.dropdownError
-        ]}
-        onPress={() => {
-          if (!disabled && options.length > 0) {
-            // Here you would typically open a picker modal
-            // For now, we'll just select the first option as demo
-            if (options.length > 0) {
-              onSelect(options[0].id)
-            }
-          }
-        }}
-        disabled={disabled}
-      >
-        <Text style={[
-          styles.dropdownText,
-          !value && styles.dropdownPlaceholder
-        ]}>
-          {value ? options.find(opt => opt.id === value)?.name || placeholder : placeholder}
-        </Text>
-        <Icon name="arrow-drop-down" size={24} color={theme.textSecondary} />
-      </TouchableOpacity>
-      {errors[label.toLowerCase().replace(' ', '')] && (
-        <Text style={styles.errorText}>{errors[label.toLowerCase().replace(' ', '')]}</Text>
-      )}
-    </View>
-  )
 
   const styles = StyleSheet.create({
     container: {
@@ -350,38 +308,6 @@ export const ProductFormScreen: React.FC = () => {
     },
     required: {
       color: theme.danger,
-    },
-    dropdown: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      borderWidth: 1,
-      borderColor: theme.border,
-      borderRadius: borderRadius.base,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      backgroundColor: theme.surface,
-      minHeight: 48,
-    },
-    dropdownDisabled: {
-      opacity: 0.6,
-      backgroundColor: theme.gray100,
-    },
-    dropdownError: {
-      borderColor: theme.danger,
-    },
-    dropdownText: {
-      fontSize: typography.fontSize.base,
-      color: theme.text,
-      flex: 1,
-    },
-    dropdownPlaceholder: {
-      color: theme.textSecondary,
-    },
-    errorText: {
-      fontSize: typography.fontSize.xs,
-      color: theme.danger,
-      marginTop: spacing.xs,
     },
     imageSection: {
       alignItems: 'center',
@@ -487,34 +413,35 @@ export const ProductFormScreen: React.FC = () => {
           />
 
           {/* Brand and Category */}
-          {renderDropdown(
-            'Brand',
-            formData.brandId,
-            brands,
-            (value) => updateFormData('brandId', value),
-            'Select a brand',
-            true
-          )}
+          <SelectModal
+            label="Brand"
+            value={formData.brandId}
+            options={brands}
+            onSelect={(value) => updateFormData('brandId', value)}
+            placeholder="Select a brand"
+            required
+            error={errors.brandId}
+          />
 
-          {renderDropdown(
-            'Category',
-            formData.categoryId,
-            filteredCategories,
-            (value) => updateFormData('categoryId', value),
-            'Select a category',
-            true,
-            !formData.brandId
-          )}
+          <SelectModal
+            label="Category"
+            value={formData.categoryId}
+            options={filteredCategories}
+            onSelect={(value) => updateFormData('categoryId', value)}
+            placeholder="Select a category"
+            required
+            disabled={!formData.brandId}
+            error={errors.categoryId}
+          />
 
-          {renderDropdown(
-            'Collection',
-            formData.collectionId,
-            filteredCollections,
-            (value) => updateFormData('collectionId', value),
-            'Select collection (optional)',
-            false,
-            !formData.categoryId
-          )}
+          <SelectModal
+            label="Collection"
+            value={formData.collectionId}
+            options={filteredCollections}
+            onSelect={(value) => updateFormData('collectionId', value)}
+            placeholder="Select collection (optional)"
+            disabled={!formData.categoryId}
+          />
 
           <TextInput
             label="Description"
@@ -558,25 +485,25 @@ export const ProductFormScreen: React.FC = () => {
           {/* Size and Finish Type */}
           <View style={styles.formRow}>
             <View style={styles.formRowItem}>
-              {renderDropdown(
-                'Size',
-                formData.sizeId,
-                filteredSizes,
-                (value) => updateFormData('sizeId', value),
-                'Select size (optional)',
-                false,
-                !formData.categoryId
-              )}
+              <SelectModal
+                label="Size"
+                value={formData.sizeId}
+                options={filteredSizes}
+                onSelect={(value) => updateFormData('sizeId', value)}
+                placeholder="Select size (optional)"
+                disabled={!formData.categoryId}
+              />
             </View>
             <View style={styles.formRowItem}>
-              {renderDropdown(
-                'Finish Type',
-                formData.finishTypeId,
-                finishTypes,
-                (value) => updateFormData('finishTypeId', value),
-                'Select finish type',
-                true
-              )}
+              <SelectModal
+                label="Finish Type"
+                value={formData.finishTypeId}
+                options={finishTypes}
+                onSelect={(value) => updateFormData('finishTypeId', value)}
+                placeholder="Select finish type"
+                required
+                error={errors.finishTypeId}
+              />
             </View>
           </View>
 
@@ -605,14 +532,15 @@ export const ProductFormScreen: React.FC = () => {
           </View>
 
           {/* Inventory Information */}
-          {renderDropdown(
-            'Location',
-            formData.locationId,
-            locations,
-            (value) => updateFormData('locationId', value),
-            'Select location',
-            true
-          )}
+          <SelectModal
+            label="Location"
+            value={formData.locationId}
+            options={locations}
+            onSelect={(value) => updateFormData('locationId', value)}
+            placeholder="Select location"
+            required
+            error={errors.locationId}
+          />
 
           <TextInput
             label="Batch Name"

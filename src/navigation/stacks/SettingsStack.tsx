@@ -15,6 +15,7 @@ export const SettingsStack: React.FC = () => {
 
   return (
     <Stack.Navigator
+      id="SettingsStack"
       screenOptions={{
         header: (props: any) => <Header {...props} />,
         cardStyle: { backgroundColor: theme.background }

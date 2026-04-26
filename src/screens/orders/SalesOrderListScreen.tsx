@@ -63,11 +63,11 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
 
   const getStatusIcon = (status: SalesOrder['status']) => {
     switch (status) {
-      case 'DRAFT': return 'file-document-edit-outline'
-      case 'CONFIRMED': return 'check-circle-outline'
-      case 'DELIVERED': return 'truck-delivery'
-      case 'CANCELLED': return 'close-circle-outline'
-      default: return 'help-circle-outline'
+      case 'DRAFT': return 'edit-note'
+      case 'CONFIRMED': return 'check-circle'
+      case 'DELIVERED': return 'local-shipping'
+      case 'CANCELLED': return 'cancel'
+      default: return 'help'
     }
   }
 
@@ -361,7 +361,7 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
         style={styles.fab}
         onPress={() => navigation.navigate('SalesOrderForm')}
       >
-        <Icon name="plus" size={24} color={theme.textInverse} />
+        <Icon name="add" size={24} color={theme.textInverse} />
       </TouchableOpacity>
     </SafeAreaView>
   )

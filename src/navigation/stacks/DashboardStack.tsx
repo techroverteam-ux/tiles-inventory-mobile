@@ -13,6 +13,7 @@ export const DashboardStack: React.FC = () => {
 
   return (
     <Stack.Navigator
+      id="DashboardStack"
       screenOptions={{
         header: (props: any) => <Header {...props} />,
         cardStyle: { backgroundColor: theme.background }

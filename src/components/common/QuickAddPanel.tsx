@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 80,
+    bottom: 80, // 64 (BottomNavBar height) + 16 (spacing)
     width: 56,
     height: 56,
     borderRadius: 28,

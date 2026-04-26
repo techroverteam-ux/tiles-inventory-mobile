@@ -13,6 +13,7 @@ export const CustomersStack: React.FC = () => {
 
   return (
     <Stack.Navigator
+      id="CustomersStack"
       screenOptions={{
         header: (props: any) => <Header {...props} />,
         cardStyle: { backgroundColor: theme.background }

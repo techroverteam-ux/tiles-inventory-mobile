@@ -136,16 +136,16 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
         
         <View style={styles.productActions}>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: withOpacity(theme.primary, 0.12) }]}
+            style={[styles.actionButton, { backgroundColor: theme.primary }]}
             onPress={() => navigation.navigate('ProductForm', { product: item })}
           >
-            <Icon name="edit" size={16} color={theme.primary} />
+            <Icon name="edit" size={18} color="#ffffff" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: withOpacity(theme.error, 0.12) }]}
+            style={[styles.actionButton, { backgroundColor: theme.error }]}
             onPress={() => handleDeleteProduct(item)}
           >
-            <Icon name="delete" size={16} color={theme.error} />
+            <Icon name="delete" size={18} color="#ffffff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -232,13 +232,15 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
       flexDirection: 'row',
       gap: spacing.sm,
       alignItems: 'flex-start',
+      flexShrink: 0,
     },
     actionButton: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'hidden',
     },
     productFooter: {
       borderTopWidth: 1,

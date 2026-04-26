@@ -19,7 +19,7 @@ import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { LoadingSpinner } from '../../components/loading'
 import { collectionService, Collection } from '../../services/api/ApiServices'
-import { spacing, typography, borderRadius } from '../../theme'
+import { spacing, typography } from '../../theme'
 
 interface CollectionManagementScreenProps {
   navigation: any
@@ -55,18 +55,21 @@ export const CollectionManagementScreen: React.FC<CollectionManagementScreenProp
       fontWeight: typography.fontWeight.bold,
       color: theme.text,
     },
-    addButton: {
+    fab: {
+      position: 'absolute',
+      right: spacing.base,
+      bottom: spacing.base,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
       backgroundColor: theme.primary,
-      paddingHorizontal: spacing.base,
-      paddingVertical: spacing.sm,
-      borderRadius: borderRadius.base,
-      flexDirection: 'row',
       alignItems: 'center',
-    },
-    addButtonText: {
-      color: theme.textInverse,
-      fontWeight: typography.fontWeight.semibold,
-      marginLeft: spacing.xs,
+      justifyContent: 'center',
+      elevation: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
     },
     listContainer: {
       flex: 1,
@@ -379,11 +382,10 @@ export const CollectionManagementScreen: React.FC<CollectionManagementScreenProp
 
       {!showAddForm && (
         <TouchableOpacity
-          style={styles.addButton}
+          style={styles.fab}
           onPress={() => setShowAddForm(true)}
         >
-          <Icon name="add" size={20} color={theme.textInverse} />
-          <Text style={styles.addButtonText}>Add Collection</Text>
+          <Icon name="add" size={24} color={theme.textInverse} />
         </TouchableOpacity>
       )}
     </SafeAreaView>

@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { SecureStorage } from '../storage/SecureStorage'
 
 class ApiClient {
@@ -25,7 +25,7 @@ class ApiClient {
   private setupInterceptors(): void {
     // Request interceptor
     this.instance.interceptors.request.use(
-      async (config: AxiosRequestConfig) => {
+      async (config: InternalAxiosRequestConfig) => {
         // Check if user is authenticated (simple flag-based auth)
         const authFlag = await SecureStorage.getAuthToken()
         if (authFlag === 'authenticated') {
@@ -55,7 +55,13 @@ class ApiClient {
       },
       async (error) => {
         if (__DEV__) {
-          console.error(`❌ API Error: ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status}`)
+          // Suppress 404 errors for optional endpoints that may not exist on this backend
+          const url = error.config?.url || ''
+          const is404 = error.response?.status === 404
+          const isOptionalEndpoint = ['/collections', '/finish-types'].some(ep => url.includes(ep))
+          if (!(is404 && isOptionalEndpoint)) {
+            console.error(`❌ API Error: ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status}`)
+          }
         }
 
         // For this API, we don't handle token refresh since there are no tokens

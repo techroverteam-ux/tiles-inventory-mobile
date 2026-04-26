@@ -261,7 +261,7 @@ export const EnhancedDashboardScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 120 },
+  scrollContent: { paddingBottom: 160 },
   welcomeSection: {
     margin: 16,
     padding: 16,

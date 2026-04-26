@@ -81,6 +81,7 @@ export const MainNavigator: React.FC = () => {
 
   return (
     <Stack.Navigator
+      id="MainStack"
       screenOptions={{
         cardStyle: { backgroundColor: theme.background }
       }}

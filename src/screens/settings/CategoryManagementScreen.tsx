@@ -133,16 +133,16 @@ export const CategoryManagementScreen: React.FC<CategoryManagementScreenProps> =
         </View>
         <View style={styles.categoryActions}>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: withOpacity(theme.primary, 0.12) }]}
+            style={[styles.actionButton, { backgroundColor: theme.primary }]}
             onPress={() => handleEdit(item)}
           >
-            <Icon name="edit" size={16} color={theme.primary} />
+            <Icon name="edit" size={16} color="#ffffff" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: withOpacity(theme.error, 0.12) }]}
+            style={[styles.actionButton, { backgroundColor: theme.error }]}
             onPress={() => handleDelete(item)}
           >
-            <Icon name="delete" size={16} color={theme.error} />
+            <Icon name="delete" size={16} color="#ffffff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -326,7 +326,7 @@ export const CategoryManagementScreen: React.FC<CategoryManagementScreenProps> =
           ListEmptyComponent={
             !loading ? (
               <View style={styles.emptyContainer}>
-                <Icon name="shape" size={64} color={theme.textSecondary} />
+                <Icon name="category" size={64} color={theme.textSecondary} />
                 <Text style={styles.emptyText}>No categories available</Text>
               </View>
             ) : null
@@ -339,7 +339,7 @@ export const CategoryManagementScreen: React.FC<CategoryManagementScreenProps> =
           style={styles.fab}
           onPress={() => setShowAddForm(true)}
         >
-          <Icon name="plus" size={24} color={theme.textInverse} />
+          <Icon name="add" size={24} color={theme.textInverse} />
         </TouchableOpacity>
       )}
     </SafeAreaView>

@@ -14,6 +14,7 @@ export const InventoryStack: React.FC = () => {
 
   return (
     <Stack.Navigator
+      id="InventoryStack"
       screenOptions={{
         header: (props: any) => <Header {...props} />,
         cardStyle: { backgroundColor: theme.background }

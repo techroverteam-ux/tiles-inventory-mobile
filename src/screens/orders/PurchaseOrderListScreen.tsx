@@ -63,11 +63,11 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
 
   const getStatusIcon = (status: PurchaseOrder['status']) => {
     switch (status) {
-      case 'PENDING': return 'clock-outline'
-      case 'CONFIRMED': return 'check-circle-outline'
-      case 'DELIVERED': return 'truck-delivery'
-      case 'CANCELLED': return 'close-circle-outline'
-      default: return 'help-circle-outline'
+      case 'PENDING': return 'schedule'
+      case 'CONFIRMED': return 'check-circle'
+      case 'DELIVERED': return 'local-shipping'
+      case 'CANCELLED': return 'cancel'
+      default: return 'help'
     }
   }
 
@@ -335,7 +335,7 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
           ListEmptyComponent={
             !loading ? (
               <View style={styles.emptyContainer}>
-                <Icon name="file-document-multiple" size={64} color={theme.textSecondary} />
+                <Icon name="description" size={64} color={theme.textSecondary} />
                 <Text style={styles.emptyText}>
                   {filter === 'ALL' ? 'No purchase orders available' : `No ${filter.toLowerCase()} orders`}
                 </Text>
@@ -349,7 +349,7 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
         style={styles.fab}
         onPress={() => navigation.navigate('PurchaseOrderForm')}
       >
-        <Icon name="plus" size={24} color={theme.textInverse} />
+        <Icon name="add" size={24} color={theme.textInverse} />
       </TouchableOpacity>
     </SafeAreaView>
   )

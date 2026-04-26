@@ -40,7 +40,7 @@ export const AppNavigator: React.FC = () => {
         backgroundColor={theme.surface}
       />
       <NavigationContainer theme={navigationTheme}>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator id="RootStack" screenOptions={{ headerShown: false }}>
           {isAuthenticated ? (
             <Stack.Screen name="Main" component={MainNavigator} />
           ) : (

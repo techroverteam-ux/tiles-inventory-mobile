@@ -463,7 +463,11 @@ export const collectionService = {
         : { page: pageOrBrandId, limit: typeof limitOrCategoryId === 'number' ? limitOrCategoryId : 50 }
       const response = await apiClient.get('/collections', { params })
       return response.data
-    } catch (error) {
+    } catch (error: any) {
+      // Endpoint may not exist on this backend — return empty silently
+      if (error?.response?.status === 404) {
+        return { collections: [], total: 0 }
+      }
       console.error('Failed to fetch collections:', error)
       return { collections: [], total: 0 }
     }
@@ -819,7 +823,11 @@ export const finishTypeService = {
     try {
       const response = await apiClient.get('/finish-types')
       return response.data
-    } catch (error) {
+    } catch (error: any) {
+      // Endpoint may not exist on this backend — return empty silently
+      if (error?.response?.status === 404) {
+        return { finishTypes: [], total: 0 }
+      }
       console.error('Failed to fetch finish types:', error)
       return { finishTypes: [], total: 0 }
     }
