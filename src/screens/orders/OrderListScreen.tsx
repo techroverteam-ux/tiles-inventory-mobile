@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
+  TextInput,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
@@ -40,6 +41,7 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [search, setSearch] = useState('')
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -51,12 +53,12 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
     loadOrders(1)
   }, [orderType])
 
-  const loadOrders = async (page: number) => {
+  const loadOrders = async (page: number, q = search) => {
     try {
       setLoading(true)
       let ordersData = []
       let total = 0
-      
+
       if (orderType === 'purchase') {
         const response = await purchaseOrderService.getPurchaseOrders(page, itemsPerPage)
         ordersData = response.purchaseOrders || []
@@ -66,10 +68,19 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
         ordersData = response.salesOrders || []
         total = response.total || 0
       }
-      
-      setOrders(ordersData)
-      setTotalItems(total)
-      setTotalPages(Math.max(1, Math.ceil(total / itemsPerPage)))
+
+      // Client-side search filter since API may not support search param
+      const filtered = q.trim()
+        ? ordersData.filter((o: any) =>
+            o.orderNumber?.toLowerCase().includes(q.toLowerCase()) ||
+            o.brand?.name?.toLowerCase().includes(q.toLowerCase()) ||
+            o.supplierName?.toLowerCase().includes(q.toLowerCase())
+          )
+        : ordersData
+
+      setOrders(filtered)
+      setTotalItems(q.trim() ? filtered.length : total)
+      setTotalPages(Math.max(1, Math.ceil((q.trim() ? filtered.length : total) / itemsPerPage)))
       setCurrentPage(page)
     } catch (error) {
       console.error(`Error loading ${orderType} orders:`, error)
@@ -77,6 +88,11 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSearch = (q: string) => {
+    setSearch(q)
+    loadOrders(1, q)
   }
 
   const handleRefresh = async () => {
@@ -133,11 +149,13 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
     }).replace(/ /g, '-')
     const amount = item.totalAmount
     const itemCount = item.items?.length || 0
-    const partnerName = isPurchase ? (item as PurchaseOrder).supplierName : (item as SalesOrder).customerName
+    const partnerName = isPurchase
+      ? ((item as any).brand?.name || (item as PurchaseOrder).supplierName || 'N/A')
+      : (item as SalesOrder).customerName
 
     return (
       <Card style={[
-        commonStyles.glassCard, 
+        commonStyles.glassCard,
         styles.orderCard,
         viewMode === 'grid' && styles.gridCard
       ]}>
@@ -193,14 +211,17 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
         </View>
 
         <View style={styles.actionRow}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.outlineBtn}
             onPress={() => navigation.navigate(isPurchase ? 'PurchaseOrderDetail' : 'SalesOrderDetail', { orderId: item.id })}
           >
             <Icon name="visibility" size={16} color={theme.text} />
             <Text style={styles.outlineBtnText}>View</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.outlineBtn}>
+          <TouchableOpacity
+            style={styles.outlineBtn}
+            onPress={() => navigation.navigate(isPurchase ? 'PurchaseOrderForm' : 'SalesOrderForm', { orderId: item.id })}
+          >
             <Icon name="edit" size={16} color={theme.text} />
             <Text style={styles.outlineBtnText}>Edit</Text>
           </TouchableOpacity>
@@ -220,7 +241,9 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
       day: '2-digit', month: 'short', year: 'numeric'
     }).replace(/ /g, '-')
     const amount = item.totalAmount
-    const partnerName = isPurchase ? (item as PurchaseOrder).supplierName : (item as SalesOrder).customerName
+    const partnerName = isPurchase
+      ? ((item as any).brand?.name || (item as PurchaseOrder).supplierName || 'N/A')
+      : (item as SalesOrder).customerName
 
     return (
       <TouchableOpacity 
@@ -290,6 +313,22 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
     container: {
       flex: 1,
       backgroundColor: theme.background,
+    },
+    searchBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      height: 42,
+      gap: 8,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.text,
     },
     listContainer: {
       padding: spacing.base,
@@ -495,6 +534,25 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
         onExport={handleExportData}
         onToggleFilters={handleToggleFilters}
       />
+      {/* Search bar */}
+      <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
+        <View style={[styles.searchBox]}>
+          <Icon name="search" size={18} color={theme.textSecondary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={`Search ${orderType} orders...`}
+            placeholderTextColor={theme.textSecondary}
+            value={search}
+            onChangeText={handleSearch}
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => handleSearch('')}>
+              <Icon name="close" size={16} color={theme.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
       
       <FlatList
         data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : orders}

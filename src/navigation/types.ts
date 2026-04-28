@@ -114,6 +114,7 @@ export type ProductsStackParamList = {
 export type CustomersStackParamList = {
   CustomerList: undefined
   CustomerDetail: { customerId: string }
+  CustomerForm: { customer?: any }
 }
 
 // Settings Stack Params

@@ -12,7 +12,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
-import { Header } from '../../components/navigation/Header'
+import { MainHeader } from '../../components/navigation/MainHeader'
 import { Card } from '../../components/common/Card'
 import { TextInput } from '../../components/common/TextInput'
 import { LoadingButton } from '../../components/common/LoadingButton'
@@ -315,7 +315,7 @@ export const CollectionManagementScreen: React.FC<CollectionManagementScreenProp
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Collection Management" showBack onBackPress={() => navigation.goBack()} />
+      <MainHeader />
 
       <View style={styles.content}>
         {showAddForm && (

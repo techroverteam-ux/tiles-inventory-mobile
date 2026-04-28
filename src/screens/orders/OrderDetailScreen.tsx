@@ -279,10 +279,12 @@ export const OrderDetailScreen: React.FC<OrderDetailScreenProps> = ({ route, nav
             </View>
             <View style={[styles.row, styles.lastRow]}>
               <Text style={styles.label}>
-                {orderType === 'purchase' ? 'Supplier' : 'Customer'}
+                {orderType === 'purchase' ? 'Brand' : 'Customer'}
               </Text>
               <Text style={styles.value}>
-                {orderType === 'purchase' ? order.supplierName : order.customerName}
+                {orderType === 'purchase'
+                  ? (order.brand?.name || order.supplierName || 'N/A')
+                  : (order.customerName || 'N/A')}
               </Text>
             </View>
           </Card>

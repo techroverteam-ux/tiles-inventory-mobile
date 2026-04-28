@@ -3,6 +3,7 @@ import { createStackNavigator } from '@react-navigation/stack'
 import { useTheme } from '../../context/ThemeContext'
 import { CustomerListScreen } from '../../screens/customers/CustomerListScreen'
 import { CustomerDetailScreen } from '../../screens/customers/CustomerDetailScreen'
+import { CustomerFormScreen } from '../../screens/customers/CustomerFormScreen'
 import { Header } from '../../components/navigation/Header'
 import { CustomersStackParamList } from '../types'
 
@@ -19,15 +20,20 @@ export const CustomersStack: React.FC = () => {
         cardStyle: { backgroundColor: theme.background }
       }}
     >
-      <Stack.Screen 
-        name="CustomerList" 
+      <Stack.Screen
+        name="CustomerList"
         component={CustomerListScreen}
         options={{ title: 'Customers' }}
       />
-      <Stack.Screen 
-        name="CustomerDetail" 
+      <Stack.Screen
+        name="CustomerDetail"
         component={CustomerDetailScreen}
         options={{ title: 'Customer Details' }}
+      />
+      <Stack.Screen
+        name="CustomerForm"
+        component={CustomerFormScreen}
+        options={{ title: 'Customer' }}
       />
     </Stack.Navigator>
   )

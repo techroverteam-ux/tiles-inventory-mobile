@@ -94,8 +94,9 @@ export const EnhancedDashboardScreen: React.FC = () => {
       if (ordersRes.status === 'fulfilled') setRecentOrders(ordersRes.value.data || [])
       if (notifRes.status === 'fulfilled') {
         const notifData = notifRes.value.data
-        const unread = (notifData?.notifications || []).filter((n: any) => !n.isRead && !n.read).length
-        setNotificationCount(notifData?.total ? Math.min(notifData.total, 99) : unread)
+        const notifs = notifData?.notifications || []
+        const unread = notifs.filter((n: any) => !n.read && !n.isRead).length
+        setNotificationCount(Math.min(unread, 99))
       }
     } catch {}
     finally { setLoading(false) }
@@ -304,7 +305,7 @@ export const EnhancedDashboardScreen: React.FC = () => {
           <TouchableOpacity 
             style={s.generateBtn} 
             activeOpacity={0.7}
-            onPress={() => showInfo('Web Feature', 'PDF generation is handled on the web portal')}
+            onPress={() => navigation.navigate('Reports')}
           >
             <LucideIcons.Download size={16} color={theme.text} strokeWidth={2.5} />
             <Text style={s.generateBtnText}>Generate Report</Text>

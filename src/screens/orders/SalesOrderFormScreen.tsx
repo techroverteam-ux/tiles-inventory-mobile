@@ -125,10 +125,11 @@ export const SalesOrderFormScreen: React.FC = () => {
         let success = 0
         for (const entry of all) {
           await salesOrderService.createSalesOrder({
+            productId: entry.productId,
+            batchId: entry.batchId,
+            quantity: Number(entry.quantity),
+            soldDate: entry.soldDate || new Date().toISOString().split('T')[0],
             orderNumber: `SO-${Date.now()}`,
-            items: [{ productId: entry.productId, quantity: Number(entry.quantity), unitPrice: 0, totalPrice: 0, productName: '' }],
-            totalAmount: 0, orderDate: entry.soldDate || new Date().toISOString(),
-            customerId: '', customerName: '', status: 'DRAFT' as const,
           })
           success++
         }

@@ -144,7 +144,9 @@ export const purchaseOrderService = {
       const response = await apiClient.get('/purchase-orders', {
         params: { page, limit }
       })
-      return response.data
+      const data = response.data
+      const orders = data.orders || data.purchaseOrders || []
+      return { purchaseOrders: orders, total: data.pagination?.total || orders.length }
     } catch (error) {
       console.error('Failed to fetch purchase orders:', error)
       return { purchaseOrders: [], total: 0 }
@@ -153,15 +155,27 @@ export const purchaseOrderService = {
 
   getPurchaseOrder: async (id: string): Promise<PurchaseOrder> => {
     try {
-      const response = await apiClient.get(`/purchase-orders/${id}`)
-      return response.data
+      // Fetch from list and find by ID since the API doesn't have a GET by ID endpoint
+      const response = await apiClient.get('/purchase-orders', { params: { limit: 1000 } })
+      const orders = response.data.orders || response.data.purchaseOrders || []
+      const order = orders.find((o: any) => o.id === id)
+      if (!order) throw new Error('Order not found')
+      return order
     } catch (error) {
       console.error('Failed to fetch purchase order:', error)
       throw error
     }
   },
 
-  createPurchaseOrder: async (data: Partial<PurchaseOrder>): Promise<PurchaseOrder> => {
+  createPurchaseOrder: async (data: {
+    productId: string
+    orderDate: string
+    expectedDate?: string
+    quantity: number
+    amount?: number
+    batchName?: string
+    orderNumber?: string
+  }): Promise<any> => {
     try {
       const response = await apiClient.post('/purchase-orders', data)
       return response.data
@@ -171,7 +185,13 @@ export const purchaseOrderService = {
     }
   },
 
-  updatePurchaseOrder: async (id: string, data: Partial<PurchaseOrder>): Promise<PurchaseOrder> => {
+  updatePurchaseOrder: async (id: string, data: {
+    orderNumber?: string
+    brandId?: string
+    orderDate?: string
+    expectedDate?: string
+    status?: string
+  }): Promise<any> => {
     try {
       const response = await apiClient.put(`/purchase-orders/${id}`, data)
       return response.data
@@ -183,7 +203,7 @@ export const purchaseOrderService = {
 
   updateStatus: async (id: string, status: 'PENDING' | 'CONFIRMED' | 'RECEIVED' | 'DELIVERED' | 'CANCELLED'): Promise<PurchaseOrder> => {
     try {
-      const response = await apiClient.patch(`/purchase-orders/${id}`, { status })
+      const response = await apiClient.put(`/purchase-orders/${id}`, { status })
       return response.data
     } catch (error) {
       console.error('Failed to update purchase order status:', error)
@@ -240,7 +260,9 @@ export const salesOrderService = {
       const response = await apiClient.get('/sales-orders', {
         params: { page, limit }
       })
-      return response.data
+      const data = response.data
+      const orders = data.orders || data.salesOrders || []
+      return { salesOrders: orders, total: data.pagination?.total || orders.length }
     } catch (error) {
       console.error('Failed to fetch sales orders:', error)
       return { salesOrders: [], total: 0 }
@@ -249,15 +271,25 @@ export const salesOrderService = {
 
   getSalesOrder: async (id: string): Promise<SalesOrder> => {
     try {
-      const response = await apiClient.get(`/sales-orders/${id}`)
-      return response.data
+      // Fetch from list and find by ID since the API doesn't have a GET by ID endpoint
+      const response = await apiClient.get('/sales-orders', { params: { limit: 1000 } })
+      const orders = response.data.orders || response.data.salesOrders || []
+      const order = orders.find((o: any) => o.id === id)
+      if (!order) throw new Error('Order not found')
+      return order
     } catch (error) {
       console.error('Failed to fetch sales order:', error)
       throw error
     }
   },
 
-  createSalesOrder: async (data: Partial<SalesOrder>): Promise<SalesOrder> => {
+  createSalesOrder: async (data: {
+    productId: string
+    batchId: string
+    quantity: number
+    soldDate: string
+    orderNumber: string
+  }): Promise<any> => {
     try {
       const response = await apiClient.post('/sales-orders', data)
       return response.data
@@ -267,7 +299,17 @@ export const salesOrderService = {
     }
   },
 
-  updateSalesOrder: async (id: string, data: Partial<SalesOrder>): Promise<SalesOrder> => {
+  updateSalesOrder: async (id: string, data: {
+    orderNumber?: string
+    brandId?: string
+    categoryId?: string
+    sizeId?: string
+    locationId?: string
+    batchName?: string
+    quantity?: number
+    amount?: number
+    soldDate?: string
+  }): Promise<any> => {
     try {
       const response = await apiClient.put(`/sales-orders/${id}`, data)
       return response.data
@@ -279,6 +321,7 @@ export const salesOrderService = {
 
   updateStatus: async (id: string, status: 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'): Promise<SalesOrder> => {
     try {
+      // Sales orders don't have a dedicated status endpoint; use the list-level approach
       const response = await apiClient.patch(`/sales-orders/${id}`, { status })
       return response.data
     } catch (error) {
@@ -330,8 +373,17 @@ export const brandService = {
     dateTo?: string
   } = {}): Promise<BrandResponse> => {
     try {
-      const response = await apiClient.get('/brands', { params: { page: 1, limit: 20, ...params } })
-      return response.data
+      const cleanParams: any = { page: 1, limit: 20, ...params }
+      if (cleanParams.isActive === 'all' || cleanParams.isActive === '') delete cleanParams.isActive
+      const response = await apiClient.get('/brands', { params: cleanParams })
+      const data = response.data
+      return {
+        brands: data.brands || [],
+        total: data.totalCount || data.total || 0,
+        totalCount: data.totalCount || 0,
+        totalPages: data.totalPages || 0,
+        currentPage: data.currentPage || 1,
+      }
     } catch (error) {
       console.error('Failed to fetch brands:', error)
       return { brands: [], total: 0, totalCount: 0, totalPages: 0, currentPage: 1 }
@@ -387,16 +439,30 @@ export interface Category {
 export interface CategoryResponse {
   categories: Category[]
   total: number
+  totalCount?: number
+  totalPages?: number
+  currentPage?: number
 }
 
 export const categoryService = {
-  getCategories: async (pageOrBrandId: number | string = 1, limit: number = 50): Promise<CategoryResponse> => {
+  getCategories: async (pageOrParams: number | {
+    page?: number; limit?: number; search?: string; isActive?: string
+  } = 1, limit: number = 50): Promise<CategoryResponse> => {
     try {
-      const params = typeof pageOrBrandId === 'string'
-        ? { brandId: pageOrBrandId }
-        : { page: pageOrBrandId, limit }
-      const response = await apiClient.get('/categories', { params })
-      return response.data
+      const params = typeof pageOrParams === 'object'
+        ? pageOrParams
+        : { page: pageOrParams, limit }
+      const cleanParams: any = { page: 1, limit: 50, ...params }
+      if (cleanParams.isActive === 'all' || cleanParams.isActive === '') delete cleanParams.isActive
+      const response = await apiClient.get('/categories', { params: cleanParams })
+      const data = response.data
+      return {
+        categories: data.categories || [],
+        total: data.totalCount || data.total || 0,
+        totalCount: data.totalCount || 0,
+        totalPages: data.totalPages || 0,
+        currentPage: data.currentPage || 1,
+      }
     } catch (error) {
       console.error('Failed to fetch categories:', error)
       return { categories: [], total: 0 }
@@ -525,19 +591,30 @@ export const collectionService = {
 export interface SizeResponse {
   sizes: Size[]
   total: number
+  totalCount?: number
+  totalPages?: number
+  currentPage?: number
 }
 
 export const sizeService = {
-  getSizes: async (pageOrBrandId: number | string = 1, limitOrCategoryId?: number | string): Promise<SizeResponse> => {
+  getSizes: async (pageOrParams: number | {
+    page?: number; limit?: number; search?: string; isActive?: string
+  } = 1, limit: number = 50): Promise<SizeResponse> => {
     try {
-      const params = typeof pageOrBrandId === 'string'
-        ? {
-            brandId: pageOrBrandId,
-            ...(typeof limitOrCategoryId === 'string' ? { categoryId: limitOrCategoryId } : {}),
-          }
-        : { page: pageOrBrandId, limit: typeof limitOrCategoryId === 'number' ? limitOrCategoryId : 50 }
-      const response = await apiClient.get('/sizes', { params })
-      return response.data
+      const params = typeof pageOrParams === 'object'
+        ? pageOrParams
+        : { page: pageOrParams, limit }
+      const cleanParams: any = { page: 1, limit: 50, ...params }
+      if (cleanParams.isActive === 'all' || cleanParams.isActive === '') delete cleanParams.isActive
+      const response = await apiClient.get('/sizes', { params: cleanParams })
+      const data = response.data
+      return {
+        sizes: data.sizes || [],
+        total: data.totalCount || data.total || 0,
+        totalCount: data.totalCount || 0,
+        totalPages: data.totalPages || 0,
+        currentPage: data.currentPage || 1,
+      }
     } catch (error) {
       console.error('Failed to fetch sizes:', error)
       return { sizes: [], total: 0 }
@@ -606,8 +683,14 @@ export interface NotificationResponse {
 export const notificationService = {
   getNotifications: async (page = 1, limit = 20): Promise<NotificationResponse> => {
     try {
-      const response = await apiClient.get('/notifications', { params: { page, limit } })
-      return response.data
+      const response = await apiClient.get('/notifications')
+      const raw = response.data.notifications || []
+      // Normalize: web uses `read` field, mobile uses `isRead`
+      const notifications = raw.map((n: any) => ({
+        ...n,
+        isRead: n.read ?? n.isRead ?? false,
+      }))
+      return { notifications, total: notifications.length }
     } catch (error) {
       console.error('Failed to fetch notifications:', error)
       return { notifications: [], total: 0 }
@@ -616,8 +699,11 @@ export const notificationService = {
 
   getNotification: async (id: string): Promise<Notification> => {
     try {
-      const response = await apiClient.get(`/notifications/${id}`)
-      return response.data
+      // Fetch all and find by ID since there's no GET by ID endpoint
+      const res = await notificationService.getNotifications()
+      const found = res.notifications.find(n => n.id === id)
+      if (!found) throw new Error('Notification not found')
+      return found
     } catch (error) {
       console.error('Failed to fetch notification:', error)
       throw error
@@ -626,7 +712,7 @@ export const notificationService = {
 
   markAsRead: async (id: string): Promise<Notification> => {
     try {
-      const response = await apiClient.patch(`/notifications/${id}/read`, {})
+      const response = await apiClient.patch(`/notifications/${id}`, { read: true })
       return response.data
     } catch (error) {
       console.error('Failed to mark notification as read:', error)
@@ -636,7 +722,7 @@ export const notificationService = {
 
   markAsUnread: async (id: string): Promise<Notification> => {
     try {
-      const response = await apiClient.patch(`/notifications/${id}/unread`, {})
+      const response = await apiClient.patch(`/notifications/${id}`, { read: false })
       return response.data
     } catch (error) {
       console.error('Failed to mark notification as unread:', error)
@@ -646,7 +732,7 @@ export const notificationService = {
 
   markAllAsRead: async (): Promise<{ success: boolean }> => {
     try {
-      const response = await apiClient.patch('/notifications/read-all', {})
+      const response = await apiClient.patch('/notifications', { action: 'markAllRead' })
       return response.data
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error)
@@ -669,7 +755,7 @@ export const notificationService = {
 
   clearAll: async (): Promise<{ success: boolean }> => {
     try {
-      const response = await apiClient.delete('/notifications/clear-all')
+      const response = await apiClient.patch('/notifications', { action: 'clearAll' })
       return response.data
     } catch (error) {
       console.error('Failed to clear all notifications:', error)
@@ -691,13 +777,27 @@ export interface Location {
 export interface LocationResponse {
   locations: Location[]
   total: number
+  totalCount?: number
+  totalPages?: number
+  currentPage?: number
 }
 
 export const locationService = {
-  getLocations: async (page: number = 1, limit: number = 50): Promise<LocationResponse> => {
+  getLocations: async (params: {
+    page?: number; limit?: number; search?: string; isActive?: string
+  } = {}): Promise<LocationResponse> => {
     try {
-      const response = await apiClient.get('/locations', { params: { page, limit } })
-      return response.data
+      const cleanParams: any = { page: 1, limit: 50, ...params }
+      if (cleanParams.isActive === 'all' || cleanParams.isActive === '') delete cleanParams.isActive
+      const response = await apiClient.get('/locations', { params: cleanParams })
+      const data = response.data
+      return {
+        locations: data.locations || [],
+        total: data.totalCount || data.total || 0,
+        totalCount: data.totalCount || 0,
+        totalPages: data.totalPages || 0,
+        currentPage: data.currentPage || 1,
+      }
     } catch (error) {
       console.error('Failed to fetch locations:', error)
       return { locations: [], total: 0 }
@@ -801,10 +901,19 @@ export interface CreateProductRequest {
 }
 
 export const productService = {
-  getProducts: async (page: number = 1, limit: number = 50): Promise<ProductResponse> => {
+  getProducts: async (page: number = 1, limit: number = 50, params?: {
+    search?: string
+    brandId?: string
+    categoryId?: string
+    sizeId?: string
+  }): Promise<ProductResponse> => {
     try {
-      const response = await apiClient.get('/products', { params: { page, limit } })
-      return response.data
+      const response = await apiClient.get('/products', { params: { page, limit, ...params } })
+      const data = response.data
+      return {
+        products: data.products || [],
+        total: data.totalCount || data.total || 0,
+      }
     } catch (error) {
       console.error('Failed to fetch products:', error)
       return { products: [], total: 0 }
@@ -889,6 +998,13 @@ export interface InventoryFilters {
   search?: string
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
+  locationId?: string
+  brandId?: string
+  categoryId?: string
+  sizeId?: string
+  lowStock?: string
+  dateFrom?: string
+  dateTo?: string
 }
 
 export interface EnquiryRequest {
@@ -963,6 +1079,36 @@ export const inventoryService = {
       }
     }
   },
+
+  addStock: async (data: {
+    productId: string
+    locationId?: string
+    batchNumber?: string
+    shade?: string
+    quantity: number
+    purchasePrice?: number
+    sellingPrice?: number
+    expiryDate?: string
+    imageUrl?: string
+  }): Promise<Batch> => {
+    const response = await apiClient.post('/inventory', data)
+    return response.data
+  },
+
+  updateInventory: async (id: string, data: {
+    batchNumber?: string
+    quantity?: number
+    purchasePrice?: number
+    sellingPrice?: number
+    imageUrl?: string
+  }): Promise<Batch> => {
+    const response = await apiClient.put(`/inventory/${id}`, data)
+    return response.data
+  },
+
+  deleteInventory: async (id: string): Promise<void> => {
+    await apiClient.delete(`/inventory/${id}`)
+  },
 }
 
 export interface Customer {
@@ -983,8 +1129,12 @@ export interface CustomerResponse {
 export const customerService = {
   getCustomers: async (page = 1, limit = 20): Promise<CustomerResponse> => {
     try {
-      const response = await apiClient.get('/customers', { params: { page, limit } })
-      return response.data
+      const response = await apiClient.get('/admin/customers', { params: { page, pageSize: limit } })
+      const data = response.data
+      return {
+        customers: data.customers || [],
+        total: data.pagination?.total || 0,
+      }
     } catch (error) {
       console.error('Failed to fetch customers:', error)
       return { customers: [], total: 0 }
@@ -992,22 +1142,22 @@ export const customerService = {
   },
 
   getCustomer: async (id: string): Promise<Customer> => {
-    const response = await apiClient.get(`/customers/${id}`)
+    const response = await apiClient.get(`/admin/customers/${id}`)
     return response.data
   },
 
   createCustomer: async (data: Partial<Customer>): Promise<Customer> => {
-    const response = await apiClient.post('/customers', data)
+    const response = await apiClient.post('/admin/customers', data)
     return response.data
   },
 
   updateCustomer: async (id: string, data: Partial<Customer>): Promise<Customer> => {
-    const response = await apiClient.put(`/customers/${id}`, data)
+    const response = await apiClient.put(`/admin/customers/${id}`, data)
     return response.data
   },
 
   deleteCustomer: async (id: string): Promise<void> => {
-    await apiClient.delete(`/customers/${id}`)
+    await apiClient.delete(`/admin/customers/${id}`)
   },
 }
 
@@ -1019,6 +1169,28 @@ export const enquiryService = {
     } catch (error) {
       console.error('Failed to submit enquiry:', error)
       throw error
+    }
+  },
+}
+
+// ============ Reports ============
+
+export const reportService = {
+  getReport: async (params: {
+    reportType: 'sales' | 'purchase' | 'inventory'
+    dateFrom?: string
+    dateTo?: string
+    brandId?: string
+    categoryId?: string
+    sizeId?: string
+    locationId?: string
+  }): Promise<{ reportType: string; columns: { key: string; label: string }[]; rows: any[] }> => {
+    try {
+      const response = await apiClient.get('/reports', { params })
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch report:', error)
+      return { reportType: params.reportType, columns: [], rows: [] }
     }
   },
 }

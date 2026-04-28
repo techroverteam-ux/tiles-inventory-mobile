@@ -59,21 +59,21 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route,
     }
 
     try {
-      // For now, we'll fetch from a mock or API
-      // In a real implementation, you'd call productService.getProduct(productId)
+      const { productService } = await import('../../services/api/ApiServices')
+      const data = await productService.getProduct(productId)
       setProduct({
-        id: productId,
-        code: 'PROD-001',
-        name: 'Sample Product',
-        category: 'Category Name',
-        brand: 'Brand Name',
-        size: 'Standard',
-        price: 999,
-        costPrice: 500,
-        quantity: 100,
-        description: 'This is a sample product description.',
-        imageUrl: undefined,
-        createdAt: new Date().toISOString(),
+        id: data.id,
+        code: data.code,
+        name: data.name,
+        category: data.category?.name,
+        brand: data.brand?.name,
+        size: data.size?.name,
+        price: undefined,
+        costPrice: undefined,
+        quantity: (data as any).totalStock ?? data.stock,
+        description: data.description,
+        imageUrl: data.imageUrl,
+        createdAt: data.createdAt,
       })
     } catch (error) {
       console.error('Failed to load product details:', error)

@@ -54,6 +54,13 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
 
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false) }
 
+  const handleMarkRead = async (id: string) => {
+    try {
+      await notificationService.markAsRead(id)
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true, read: true } : n))
+    } catch {}
+  }
+
   const handleMarkAllRead = async () => {
     try {
       await notificationService.markAllAsRead()
@@ -142,7 +149,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
     return (
       <TouchableOpacity
         style={[s.item, isUnread && s.itemUnread]}
-        onPress={() => isUnread && handleMarkAllRead()}
+        onPress={() => isUnread && handleMarkRead(item.id)}
         activeOpacity={0.7}
       >
         <View style={[s.itemIconWrap, { backgroundColor: withOpacity(color, 0.12) }]}>

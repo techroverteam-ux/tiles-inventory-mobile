@@ -8,22 +8,29 @@ import { Header } from '../../components/navigation/Header'
 import { Card } from '../../components/common/Card'
 import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
-import { inventoryService, Batch } from '../../services/api/ApiServices'
+import { Batch } from '../../services/api/ApiServices'
+import { apiClient } from '../../services/api/ApiClient'
+import { productService } from '../../services/api/ApiServices'
 import { spacing, typography, borderRadius } from '../../theme'
 
 export const InventoryDetailScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const { theme } = useTheme()
   const { showError } = useToast()
   const { productId } = route.params
-  const [batches, setBatches] = useState<Batch[]>([])
+  const [batches, setBatches] = useState<any[]>([])
+  const [product, setProduct] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
   const fetchData = async (isRefresh = false) => {
     isRefresh ? setRefreshing(true) : setLoading(true)
     try {
-      const response = await inventoryService.getInventory({ search: productId, limit: 50 })
-      setBatches(response.inventory.filter(b => b.productId === productId))
+      const [batchRes, productRes] = await Promise.allSettled([
+        apiClient.get(`/inventory/by-product/${productId}`),
+        productService.getProduct(productId),
+      ])
+      if (batchRes.status === 'fulfilled') setBatches(batchRes.value.data.batches || [])
+      if (productRes.status === 'fulfilled') setProduct(productRes.value)
     } catch {
       showError('Error', 'Failed to load inventory details')
     } finally {
@@ -34,8 +41,7 @@ export const InventoryDetailScreen: React.FC<{ navigation: any; route: any }> = 
 
   useEffect(() => { fetchData() }, [])
 
-  const product = batches[0]?.product
-  const totalQty = batches.reduce((sum, b) => sum + b.quantity, 0)
+  const totalQty = batches.reduce((sum: number, b: any) => sum + b.quantity, 0)
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
@@ -67,20 +73,20 @@ export const InventoryDetailScreen: React.FC<{ navigation: any; route: any }> = 
               <Card>
                 <Text style={styles.sectionTitle}>{product.name}</Text>
                 <View style={styles.row}><Text style={styles.label}>Code</Text><Text style={styles.value}>{product.code}</Text></View>
-                <View style={styles.row}><Text style={styles.label}>Brand</Text><Text style={styles.value}>{product.brand.name}</Text></View>
-                <View style={styles.row}><Text style={styles.label}>Category</Text><Text style={styles.value}>{product.category.name}</Text></View>
+                <View style={styles.row}><Text style={styles.label}>Brand</Text><Text style={styles.value}>{product.brand?.name}</Text></View>
+                <View style={styles.row}><Text style={styles.label}>Category</Text><Text style={styles.value}>{product.category?.name}</Text></View>
                 <View style={styles.row}><Text style={styles.label}>Total Stock</Text><Text style={[styles.value, { color: totalQty < 10 ? theme.warning : theme.success }]}>{totalQty} units</Text></View>
               </Card>
             )}
 
             <Text style={styles.sectionTitle}>Batches ({batches.length})</Text>
-            {batches.map(batch => (
+            {batches.map((batch: any) => (
               <Card key={batch.id} style={styles.batchCard}>
                 <View style={styles.row}><Text style={styles.label}>Batch #</Text><Text style={styles.value}>{batch.batchNumber}</Text></View>
-                <View style={styles.row}><Text style={styles.label}>Location</Text><Text style={styles.value}>{batch.location.name}</Text></View>
+                <View style={styles.row}><Text style={styles.label}>Location</Text><Text style={styles.value}>{batch.location?.name || 'N/A'}</Text></View>
                 <View style={styles.row}><Text style={styles.label}>Quantity</Text><Text style={styles.value}>{batch.quantity}</Text></View>
-                {batch.purchasePrice != null && <View style={styles.row}><Text style={styles.label}>Purchase Price</Text><Text style={styles.value}>${batch.purchasePrice.toFixed(2)}</Text></View>}
-                {batch.sellingPrice != null && <View style={styles.row}><Text style={styles.label}>Selling Price</Text><Text style={styles.value}>${batch.sellingPrice.toFixed(2)}</Text></View>}
+                {batch.purchasePrice != null && <View style={styles.row}><Text style={styles.label}>Purchase Price</Text><Text style={styles.value}>₹{Number(batch.purchasePrice).toFixed(2)}</Text></View>}
+                {batch.sellingPrice != null && <View style={styles.row}><Text style={styles.label}>Selling Price</Text><Text style={styles.value}>₹{Number(batch.sellingPrice).toFixed(2)}</Text></View>}
                 {batch.shade && <View style={styles.row}><Text style={styles.label}>Shade</Text><Text style={styles.value}>{batch.shade}</Text></View>}
                 <LoadingButton title="Update Stock" onPress={() => navigation.navigate('StockUpdate', { productId })} variant="outline" style={{ marginTop: spacing.sm }} />
               </Card>

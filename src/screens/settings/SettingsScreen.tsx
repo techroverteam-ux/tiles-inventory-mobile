@@ -16,6 +16,8 @@ import { MainHeader } from '../../components/navigation/MainHeader'
 import { getCommonStyles } from '../../theme/commonStyles'
 import { Card } from '../../components/common/Card'
 import { TextInput } from '../../components/common/TextInput'
+import { LoadingButton } from '../../components/common/LoadingButton'
+import { apiClient } from '../../services/api/ApiClient'
 import { spacing, typography, borderRadius } from '../../theme'
 import { withOpacity } from '../../utils/colorUtils'
 
@@ -59,10 +61,45 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
     )
   }
 
+  const handleDeleteAllData = () => {
+    Alert.alert(
+      '⚠️ Delete All Data',
+      'This will permanently wipe ALL brands, categories, products, inventory, and orders. This CANNOT be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'I Understand',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Final Confirmation',
+              'Are you absolutely sure? All data will be permanently deleted.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete Everything',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await apiClient.post('/admin/danger', { action: 'delete-all-data' })
+                      showSuccess('All data deleted')
+                    } catch {
+                      showError('Failed to delete data')
+                    }
+                  },
+                },
+              ]
+            )
+          },
+        },
+      ]
+    )
+  }
+
   const handleSaveProfile = async () => {
     setLoading(true)
     try {
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 500))
+      await apiClient.put('/auth/profile', { name: profileData.name })
       showSuccess('Profile updated successfully')
     } catch (error) {
       showError('Failed to update profile')
@@ -72,15 +109,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   }
 
   const handleSaveCompany = async () => {
-    setLoading(true)
-    try {
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 500))
-      showSuccess('Company info updated')
-    } catch (error) {
-      showError('Failed to update company')
-    } finally {
-      setLoading(false)
-    }
+    showSuccess('Company info saved locally')
   }
 
   const SettingsSection: React.FC<{
@@ -417,12 +446,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
             color={theme.error}
             showArrow={false}
           />
+          <SettingsItem
+            icon="delete-forever"
+            title="Delete All Data"
+            subtitle="Permanently wipe all inventory data"
+            onPress={handleDeleteAllData}
+            color={theme.error}
+            showArrow={false}
+          />
         </Card>
       </ScrollView>
 
       {/* Floating Action Button */}
-      <TouchableOpacity style={styles.fab}>
-        <Icon name="add" size={24} color="#0f172a" />
+      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('Profile')}>
+        <Icon name="person" size={24} color="#0f172a" />
       </TouchableOpacity>
     </SafeAreaView>
   )

@@ -37,9 +37,22 @@ export const ProductFormScreen: React.FC = () => {
   const { theme } = useTheme()
   const navigation = useNavigation()
   const route = useRoute<ProductFormRouteProp>()
-  const { productId } = route.params || {}
+  const { productId, product: existingProduct } = route.params || {}
 
-  const [formData, setFormData] = useState<ProductEntry>(emptyEntry())
+  const [formData, setFormData] = useState<ProductEntry>(
+    existingProduct
+      ? {
+          name: existingProduct.name || '',
+          brandId: existingProduct.brand?.id || existingProduct.brandId || '',
+          categoryId: existingProduct.category?.id || existingProduct.categoryId || '',
+          sizeId: existingProduct.size?.id || existingProduct.sizeId || '',
+          sqftPerBox: existingProduct.sqftPerBox ? String(existingProduct.sqftPerBox) : '',
+          pcsPerBox: existingProduct.pcsPerBox ? String(existingProduct.pcsPerBox) : '',
+          image: null,
+          imageUri: existingProduct.imageUrl || null,
+        }
+      : emptyEntry()
+  )
   const [queued, setQueued] = useState<ProductEntry[]>([])
   const [brands, setBrands] = useState<Brand[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -94,9 +107,10 @@ export const ProductFormScreen: React.FC = () => {
   const removeQueued = (i: number) => setQueued(q => q.filter((_, j) => j !== i))
 
   const saveEntry = async (entry: ProductEntry) => {
+    const editId = productId || existingProduct?.id
     const data: CreateProductRequest = {
       name: entry.name.trim(),
-      code: '',
+      code: entry.name.trim().toUpperCase().replace(/\s+/g, '-').slice(0, 20),
       brandId: entry.brandId,
       categoryId: entry.categoryId,
       sizeId: entry.sizeId || undefined,
@@ -104,8 +118,8 @@ export const ProductFormScreen: React.FC = () => {
       pcsPerBox: entry.pcsPerBox ? parseInt(entry.pcsPerBox) : undefined,
       image: entry.image || undefined,
     }
-    if (productId) {
-      await productService.updateProduct(productId, data)
+    if (editId) {
+      await productService.updateProduct(editId, data)
     } else {
       await productService.createProduct(data)
     }
@@ -115,10 +129,11 @@ export const ProductFormScreen: React.FC = () => {
     if (!validate(formData)) return
     setSaving(true)
     try {
-      const all = [...queued, formData]
+      const editId = productId || existingProduct?.id
+      const all = editId ? [formData] : [...queued, formData]
       for (const entry of all) await saveEntry(entry)
       const count = all.length
-      Alert.alert('Success', productId ? 'Product updated' : `${count} product${count > 1 ? 's' : ''} created`, [
+      Alert.alert('Success', editId ? 'Product updated' : `${count} product${count > 1 ? 's' : ''} created`, [
         { text: 'OK', onPress: () => navigation.goBack() },
       ])
     } catch (e: any) {
@@ -129,8 +144,9 @@ export const ProductFormScreen: React.FC = () => {
   }
 
   const submitLabel = (() => {
+    const editId = productId || existingProduct?.id
     const count = queued.length + 1
-    if (productId) return saving ? 'Updating...' : 'Update Product'
+    if (editId) return saving ? 'Updating...' : 'Update Product'
     return saving ? 'Creating...' : count > 1 ? `Create ${count} Products` : 'Create Product'
   })()
 
@@ -252,7 +268,7 @@ export const ProductFormScreen: React.FC = () => {
           submitLabel={submitLabel}
           onSubmit={handleSave}
           onCancel={() => navigation.goBack()}
-          onAddMore={productId ? undefined : handleAddMore}
+          onAddMore={productId || existingProduct?.id ? undefined : handleAddMore}
           loading={saving}
         />
       </ScrollView>

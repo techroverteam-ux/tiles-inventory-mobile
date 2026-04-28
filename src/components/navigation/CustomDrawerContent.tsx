@@ -34,6 +34,7 @@ const navItems: NavItem[] = [
   { name: 'SalesOrders', label: 'Sales Orders', icon: 'trending-up', screen: 'Tabs', params: { screen: 'SalesTab' } },
   { name: 'Inventory', label: 'Inventory', icon: 'layers', screen: 'Tabs', params: { screen: 'InventoryTab' } },
   { name: 'Locations', label: 'Locations', icon: 'location-on', screen: 'LocationManagement' },
+  { name: 'Customers', label: 'Customers', icon: 'people', screen: 'Customers' },
   { name: 'Reports', label: 'Reports', icon: 'description', screen: 'Reports' },
   { name: 'Settings', label: 'Settings', icon: 'settings', screen: 'Settings' },
 ]

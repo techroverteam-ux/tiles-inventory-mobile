@@ -7,17 +7,21 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
+import { useToast } from '../../context/ToastContext'
+import { MainHeader } from '../../components/navigation/MainHeader'
 import { ScreenActionBar } from '../../components/common/ScreenActionBar'
 import { getCommonStyles } from '../../theme/commonStyles'
 import { Card } from '../../components/common/Card'
 import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { salesOrderService, SalesOrder } from '../../services/api/ApiServices'
+import { exportToExcel } from '../../utils/exportUtils'
 import { spacing, typography } from '../../theme'
 import { withOpacity } from '../../utils/colorUtils'
 
@@ -27,6 +31,7 @@ interface SalesOrderListScreenProps {
 
 export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navigation }) => {
   const { theme } = useTheme()
+  const { showSuccess } = useToast()
   const [orders, setOrders] = useState<SalesOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -82,9 +87,45 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
     }
   }
 
+  const handleExport = () => {
+    exportToExcel({
+      data: orders,
+      columns: [
+        { key: 'orderNumber', label: 'Order #' },
+        { key: 'status', label: 'Status' },
+        { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${Number(v).toLocaleString()}` },
+        { key: 'orderDate', label: 'Order Date', format: (v: string) => new Date(v).toLocaleDateString() },
+      ],
+      filename: 'sales_orders_export',
+      reportTitle: 'Sales Orders Report',
+    }).then(ok => { if (ok) showSuccess('Export', 'Excel file ready to share') })
+  }
+
   const filteredOrders = orders.filter(order => 
     filter === 'ALL' || order.status === filter
   )
+
+  const handleDeleteOrder = (item: SalesOrder) => {
+    Alert.alert(
+      'Delete Order',
+      `Delete order ${item.orderNumber}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await salesOrderService.deleteSalesOrder(item.id)
+              setOrders(prev => prev.filter(o => o.id !== item.id))
+            } catch {
+              Alert.alert('Error', 'Failed to delete order')
+            }
+          },
+        },
+      ]
+    )
+  }
 
   const renderOrder = ({ item }: { item: SalesOrder }) => (
     <Card style={[commonStyles.glassCard, styles.orderCard]}>
@@ -123,7 +164,7 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
           <Text style={styles.actionBtnText}>Edit</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.deleteBtn}>
+        <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteOrder(item)}>
           <Icon name="delete-outline" size={16} color={theme.error} />
         </TouchableOpacity>
       </View>
@@ -371,6 +412,7 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
 
   return (
     <SafeAreaView style={styles.container} edges={['right', 'left']}>
+      <MainHeader />
       <ScreenActionBar
         title="Sales Orders"
         primaryActionLabel="New Order"
@@ -378,7 +420,16 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
         itemCount={filteredOrders.length}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
+        onExport={handleExport}
       />
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={[styles.filterContainer, { paddingHorizontal: spacing.base, paddingVertical: spacing.sm }]}>
+          {(['ALL', 'DRAFT', 'CONFIRMED', 'DELIVERED', 'CANCELLED'] as const).map(s => (
+            <FilterButton key={s} status={s} title={s === 'ALL' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()} />
+          ))}
+        </View>
+      </ScrollView>
       
       <View style={styles.content}>
         <FlatList

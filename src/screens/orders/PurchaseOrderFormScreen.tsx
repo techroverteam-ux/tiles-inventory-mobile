@@ -94,12 +94,13 @@ export const PurchaseOrderFormScreen: React.FC = () => {
         let success = 0
         for (const entry of all) {
           await purchaseOrderService.createPurchaseOrder({
+            productId: entry.productId,
+            orderDate: entry.orderDate || new Date().toISOString().split('T')[0],
+            expectedDate: entry.expectedDate || undefined,
+            quantity: Number(entry.quantity),
+            amount: Number(entry.amount) || 0,
+            batchName: entry.batchName || undefined,
             orderNumber: `PO-${Date.now()}`,
-            items: [{ productId: entry.productId, quantity: Number(entry.quantity), unitPrice: Number(entry.amount) || 0, totalPrice: Number(entry.amount) || 0, productName: '' }],
-            totalAmount: Number(entry.amount) || 0,
-            orderDate: entry.orderDate || new Date().toISOString(),
-            expectedDelivery: entry.expectedDate || undefined,
-            supplierId: '', supplierName: entry.batchName || '', status: 'PENDING' as const,
           })
           success++
         }

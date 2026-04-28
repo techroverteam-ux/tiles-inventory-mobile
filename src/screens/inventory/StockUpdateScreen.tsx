@@ -84,7 +84,7 @@ export const StockUpdateScreen: React.FC<{ navigation: any; route: any }> = ({ n
   const removeQueued = (i: number) => setQueued(q => q.filter((_, j) => j !== i))
 
   const saveEntry = async (entry: StockEntry) => {
-    await apiClient.post('/inventory/stock-update', {
+    await apiClient.post('/inventory', {
       productId: entry.productId,
       locationId: entry.locationId || undefined,
       quantity: Number(entry.quantity),

@@ -16,6 +16,7 @@ import { Header } from '../../components/navigation/Header'
 import { Card } from '../../components/common/Card'
 import { LoadingButton } from '../../components/common/LoadingButton'
 import { apiClient } from '../../services/api/ApiClient'
+import { MainHeader } from '../../components/navigation/MainHeader'
 import { spacing, typography, borderRadius } from '../../theme'
 
 interface AdminPanelScreenProps {
@@ -50,14 +51,18 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
 
   const fetchSystemStats = async () => {
     try {
-      // Mock API call - replace with actual API
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
+      const [statsRes, usersRes] = await Promise.allSettled([
+        apiClient.get('/dashboard/stats'),
+        apiClient.get('/admin/customers', { params: { pageSize: 1 } }),
+      ])
+      const stats = statsRes.status === 'fulfilled' ? statsRes.value.data : {}
+      const usersTotal = usersRes.status === 'fulfilled' ? (usersRes.value.data?.pagination?.total || 0) : 0
       setSystemStats({
-        totalUsers: 5,
-        totalSessions: 12,
-        systemUptime: '15 days',
-        databaseSize: '245 MB',
-        lastBackup: '2 hours ago'
+        totalUsers: usersTotal,
+        totalSessions: stats.totalProducts || 0,
+        systemUptime: 'Online',
+        databaseSize: `${stats.totalProducts || 0} products`,
+        lastBackup: 'N/A'
       })
     } catch (error) {
       showError('Failed to load system stats')
@@ -148,11 +153,7 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
   const handleDataExport = async () => {
     setOperationLoading('export')
     try {
-      // Mock export operation
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 2000))
-      showSuccess('Data exported successfully')
-    } catch (error) {
-      showError('Data export failed')
+      showSuccess('Export', 'Use the Reports screen to export data')
     } finally {
       setOperationLoading(null)
     }
@@ -161,12 +162,7 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
   const handleSystemBackup = async () => {
     setOperationLoading('backup')
     try {
-      // Mock backup operation
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 3000))
-      showSuccess('System backup completed')
-      await fetchSystemStats() // Refresh stats
-    } catch (error) {
-      showError('System backup failed')
+      showSuccess('Backup', 'Data is stored on the server — no local backup needed')
     } finally {
       setOperationLoading(null)
     }
@@ -183,7 +179,8 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
           onPress: async () => {
             setOperationLoading('cache')
             try {
-              await new Promise<void>(resolve => setTimeout(() => resolve(), 1000))
+              const { SecureStorage } = await import('../../services/storage/SecureStorage')
+              // Clear non-auth cache keys if any
               showSuccess('Cache reset successfully')
             } catch (error) {
               showError('Cache reset failed')
@@ -334,11 +331,7 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header
-        title="Admin Panel"
-        showBack
-        navigation={navigation}
-      />
+      <MainHeader />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContainer}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
+  TextInput,
+  ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
@@ -20,6 +22,7 @@ import { Card } from '../../components/common/Card'
 import { ImagePreview } from '../../components/common/ImagePreview'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { productService, Product } from '../../services/api/ApiServices'
+import { exportToExcel, commonColumns } from '../../utils/exportUtils'
 
 const resolveImageUrl = (url?: string | null) => {
   if (!url) return null
@@ -43,6 +46,7 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
+  const [search, setSearch] = useState('')
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -60,13 +64,11 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
     }, [])
   )
 
-  const loadProducts = async (page: number) => {
+  const loadProducts = async (page: number, q = search) => {
     try {
       setLoading(true)
-      const response = await productService.getProducts(page, itemsPerPage)
+      const response = await productService.getProducts(page, itemsPerPage, { search: q })
       setProducts(response.products || [])
-      
-      // Calculate pagination based on total from API
       const total = response.total || 0
       setTotalItems(total)
       setTotalPages(Math.max(1, Math.ceil(total / itemsPerPage)))
@@ -76,6 +78,11 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSearch = (q: string) => {
+    setSearch(q)
+    loadProducts(1, q)
   }
 
   const handleRefresh = async () => {
@@ -112,31 +119,35 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
   }
 
   const handleExportData = () => {
-    import('../../utils/exportUtils').then(({ exportToExcel, commonColumns }) => {
-      exportToExcel({
-        data: products,
-        columns: commonColumns.product,
-        filename: 'products_export',
-        reportTitle: 'Products Catalog Report'
-      }).then(success => {
-        if (success) showSuccess('Export', 'Excel file ready to share')
-      })
+    exportToExcel({
+      data: products,
+      columns: commonColumns.product,
+      filename: 'products_export',
+      reportTitle: 'Products Catalog Report',
+    }).then(success => {
+      if (success) showSuccess('Export', 'Excel file ready to share')
     })
   }
 
-  const handleToggleFilters = () => {
-    showWarning('Filters', 'Advanced filtering functionality will be available in the next release.')
+  const [showFilters, setShowFilters] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+
+  const handleToggleFilters = () => setShowFilters(v => !v)
+
+  const applyStatusFilter = (status: typeof statusFilter) => {
+    setStatusFilter(status)
+    loadProducts(1, search)
   }
 
   const renderProduct = ({ item }: { item: Product }) => {
-    const isOutOfStock = item.stockQuantity === 0
+    const stockQty = (item as any).totalStock ?? item.stock ?? 0
+    const isOutOfStock = stockQty === 0
     return (
       <Card style={[
-        commonStyles.glassCard, 
+        commonStyles.glassCard,
         styles.productCard,
-        viewMode === 'grid' && styles.gridCard // Apply grid width
+        viewMode === 'grid' && styles.gridCard
       ]}>
-        {/* Image Area with Badge */}
         <View style={styles.imageContainer}>
           {item.imageUrl ? (
             <TouchableOpacity onPress={() => setPreviewImage({ url: resolveImageUrl(item.imageUrl)!, name: item.name })}>
@@ -147,16 +158,14 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
               <Icon name="image" size={48} color={theme.textSecondary} />
             </View>
           )}
-          <View style={styles.activeBadge}>
-            <Text style={styles.activeBadgeText}>Active</Text>
+          <View style={[styles.activeBadge, { backgroundColor: item.isActive === false ? theme.error : theme.primary }]}>
+            <Text style={styles.activeBadgeText}>{item.isActive === false ? 'Inactive' : 'Active'}</Text>
           </View>
         </View>
 
         <View style={styles.cardContent}>
-          {/* Title */}
           <Text style={styles.productName}>{item?.name || 'Unknown Product'}</Text>
 
-          {/* Info Grid 2x2 */}
           <View style={styles.infoGrid}>
             <View style={styles.infoCol}>
               <View style={styles.infoBox}>
@@ -178,36 +187,33 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
             </View>
           </View>
 
-          {/* Total Stock Bar */}
           <View style={styles.stockBar}>
             <Text style={styles.stockLabel}>TOTAL STOCK</Text>
             <View style={[styles.stockBadge, { backgroundColor: isOutOfStock ? theme.error : theme.success }]}>
-              <Text style={styles.stockBadgeText}>{item.stockQuantity || 0} units</Text>
+              <Text style={styles.stockBadgeText}>{stockQty} units</Text>
             </View>
           </View>
 
-          {/* Footer info */}
           <View style={styles.footerInfo}>
             <View style={styles.footerRow}>
               <Text style={styles.footerLabel}>Created:</Text>
-              <Text style={styles.footerValue}>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-')}</Text>
+              <Text style={styles.footerValue}>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-') : 'N/A'}</Text>
             </View>
             <View style={styles.footerRow}>
               <Text style={styles.footerLabel}>By:</Text>
-              <Text style={styles.footerValue}>Admin User</Text>
+              <Text style={styles.footerValue}>{(item as any).createdBy?.name || 'System'}</Text>
             </View>
           </View>
 
-          {/* Actions */}
           <View style={styles.actionRow}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.editBtn}
               onPress={() => navigation.navigate('ProductForm', { product: item })}
             >
               <Icon name="edit" size={16} color={theme.text} />
               <Text style={styles.editBtnText}>Edit</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.deleteBtn}
               onPress={() => handleDeleteProduct(item)}
             >
@@ -221,9 +227,10 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
   }
 
   const renderProductRow = ({ item }: { item: Product }) => {
-    const isOutOfStock = item.stockQuantity === 0
+    const stockQty = (item as any).totalStock ?? item.stock ?? 0
+    const isOutOfStock = stockQty === 0
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.tableRow}
         onPress={() => navigation.navigate('ProductForm', { product: item })}
         activeOpacity={0.7}
@@ -242,7 +249,7 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
         </View>
         <View style={styles.colStock}>
           <View style={[styles.rowBadge, { backgroundColor: isOutOfStock ? theme.error : theme.primary }]}>
-            <Text style={styles.rowBadgeText}>{item.stockQuantity} units</Text>
+            <Text style={styles.rowBadgeText}>{stockQty} units</Text>
           </View>
         </View>
         <View style={styles.colSize}>
@@ -298,6 +305,26 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
       flex: 1,
       backgroundColor: theme.background,
     },
+    searchRow: {
+      paddingHorizontal: 16,
+      paddingBottom: 10,
+    },
+    searchBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      height: 42,
+      gap: 8,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.text,
+    },
     listContainer: {
       padding: spacing.base,
       paddingBottom: 80,
@@ -307,6 +334,9 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
       padding: 0,
       borderRadius: 24,
       overflow: 'hidden',
+    },
+    gridCard: {
+      width: '100%',
     },
     imageContainer: {
       width: '100%',
@@ -550,6 +580,50 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
         onExport={handleExportData}
         onToggleFilters={handleToggleFilters}
       />
+      {/* Search bar */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchBox}>
+          <Icon name="search" size={18} color={theme.mutedForeground} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search products..."
+            placeholderTextColor={theme.mutedForeground}
+            value={search}
+            onChangeText={handleSearch}
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => handleSearch('')}>
+              <Icon name="close" size={16} color={theme.mutedForeground} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+      {/* Filter bar */}
+      {showFilters && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {(['all', 'active', 'inactive'] as const).map(s => (
+                <TouchableOpacity
+                  key={s}
+                  onPress={() => applyStatusFilter(s)}
+                  style={{
+                    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+                    borderWidth: 1,
+                    borderColor: statusFilter === s ? theme.primary : theme.border,
+                    backgroundColor: statusFilter === s ? theme.primary : 'transparent',
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: statusFilter === s ? theme.primaryForeground : theme.text }}>
+                    {s === 'all' ? 'All Status' : s === 'active' ? 'Active' : 'Inactive'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      )}
       
       <FlatList
         data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : products}

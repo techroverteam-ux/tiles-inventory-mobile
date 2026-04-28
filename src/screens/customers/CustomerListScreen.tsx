@@ -9,8 +9,10 @@ import {
   TextInput,
 } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
+import { useNavigation } from '@react-navigation/native'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
+import { MainHeader } from '../../components/navigation/MainHeader'
 import { LoadingSpinner } from '../../components/loading'
 import { spacing, typography, borderRadius } from '../../theme'
 
@@ -29,6 +31,7 @@ interface Customer {
 export const CustomerListScreen: React.FC = () => {
   const { theme } = useTheme()
   const { showToast } = useToast()
+  const navigation = useNavigation<any>()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -45,6 +48,9 @@ export const CustomerListScreen: React.FC = () => {
       padding: spacing.base,
       borderBottomWidth: 1,
       borderBottomColor: theme.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
     title: {
       fontSize: typography.fontSize.xl,
@@ -151,31 +157,19 @@ export const CustomerListScreen: React.FC = () => {
   const loadCustomers = async () => {
     try {
       setLoading(true)
-      // Mock data - replace with actual API call
-      const mockCustomers: Customer[] = [
-        {
-          id: '1',
-          name: 'John Doe',
-          email: 'john@example.com',
-          phone: '+1234567890',
-          address: '123 Main St, City',
-          totalOrders: 5,
-          totalAmount: 15000,
-          lastOrderDate: '2024-01-15',
-          createdAt: '2023-12-01',
-        },
-        {
-          id: '2',
-          name: 'Jane Smith',
-          email: 'jane@example.com',
-          phone: '+1234567891',
-          totalOrders: 3,
-          totalAmount: 8500,
-          lastOrderDate: '2024-01-10',
-          createdAt: '2023-11-15',
-        },
-      ]
-      setCustomers(mockCustomers)
+      const { customerService } = await import('../../services/api/ApiServices')
+      const response = await customerService.getCustomers()
+      setCustomers((response.customers || []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        phone: c.phone,
+        address: c.address,
+        totalOrders: c.totalOrders || 0,
+        totalAmount: c.totalAmount || 0,
+        lastOrderDate: c.lastOrderDate,
+        createdAt: c.createdAt || new Date().toISOString(),
+      })))
     } catch (error) {
       showToast('Failed to load customers', 'error')
     } finally {
@@ -211,7 +205,7 @@ export const CustomerListScreen: React.FC = () => {
   }
 
   const renderCustomer = ({ item }: { item: Customer }) => (
-    <TouchableOpacity style={styles.customerCard}>
+    <TouchableOpacity style={styles.customerCard} onPress={() => (navigation as any).navigate('CustomerDetail', { customerId: item.id })}>
       <View style={styles.customerHeader}>
         <View style={styles.customerInfo}>
           <Text style={styles.customerName}>{item.name}</Text>
@@ -252,8 +246,35 @@ export const CustomerListScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      <MainHeader />
       <View style={styles.header}>
         <Text style={styles.title}>Customers</Text>
+        <TouchableOpacity
+          onPress={() => {
+            const { exportToExcel } = require('../../utils/exportUtils')
+            exportToExcel({
+              data: customers,
+              columns: [
+                { key: 'name', label: 'Name' },
+                { key: 'email', label: 'Email' },
+                { key: 'phone', label: 'Phone' },
+                { key: 'address', label: 'Address' },
+                { key: 'createdAt', label: 'Created', format: (v: string) => v ? new Date(v).toLocaleDateString() : '' },
+              ],
+              filename: 'customers_export',
+              reportTitle: 'Customers Report',
+            })
+          }}
+          style={{ padding: 8, backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.border }}
+        >
+          <Icon name="file-download" size={20} color={theme.text} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => (navigation as any).navigate('CustomerForm')}
+          style={{ padding: 8, backgroundColor: theme.primary, borderRadius: 8 }}
+        >
+          <Icon name="add" size={20} color={theme.primaryForeground} />
+        </TouchableOpacity>
         <View style={styles.searchContainer}>
           <Icon name="search" size={20} color={theme.textSecondary} />
           <TextInput

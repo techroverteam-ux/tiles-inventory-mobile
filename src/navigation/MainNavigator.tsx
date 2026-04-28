@@ -15,8 +15,11 @@ import { ProductListScreen } from '../screens/products/ProductListScreenComplete
 import { OrderFormScreen } from '../screens/orders/OrderFormScreen'
 import { PurchaseOrderListScreen } from '../screens/orders/PurchaseOrderListScreen'
 import { PurchaseOrderFormScreen } from '../screens/orders/PurchaseOrderFormScreen'
+import { PurchaseOrderDetailScreen } from '../screens/orders/PurchaseOrderDetailScreen'
 import { SalesOrderListScreen } from '../screens/orders/SalesOrderListScreen'
 import { SalesOrderFormScreen } from '../screens/orders/SalesOrderFormScreen'
+import { SalesOrderDetailScreen } from '../screens/orders/SalesOrderDetailScreen'
+import { StockUpdateScreen } from '../screens/inventory/StockUpdateScreen'
 import { BrandManagementScreen } from '../screens/settings/BrandManagementScreen'
 import { CategoryManagementScreen } from '../screens/settings/CategoryManagementScreen'
 import { SizeManagementScreen } from '../screens/settings/SizeManagementScreen'
@@ -146,6 +149,21 @@ export const MainNavigator: React.FC = () => {
             title: 'Sales Order',
             headerShown: false,
           }}
+        />
+        <Stack.Screen
+          name="PurchaseOrderDetail"
+          component={PurchaseOrderDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="SalesOrderDetail"
+          component={SalesOrderDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PurchaseOrderDeliver"
+          component={PurchaseOrderDetailScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen 
           name="BrandManagement" 

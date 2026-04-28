@@ -1,12 +1,7 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  RefreshControl,
-  TouchableOpacity,
-  Image,
+  View, Text, FlatList, StyleSheet, RefreshControl,
+  TouchableOpacity, Image, Alert, Modal, ScrollView, TextInput as RNTextInput,
 } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -18,10 +13,11 @@ import { ScreenActionBar } from '../../components/common/ScreenActionBar'
 import { PaginationControl } from '../../components/common/PaginationControl'
 import { Card } from '../../components/common/Card'
 import { Skeleton } from '../../components/loading/Skeleton'
-import { spacing, typography, borderRadius } from '../../theme'
+import { spacing } from '../../theme'
 import { getCommonStyles } from '../../theme/commonStyles'
 import { InventoryNavigationProp } from '../../navigation/types'
 import { inventoryService, Batch } from '../../services/api/ApiServices'
+import { withOpacity } from '../../utils/colorUtils'
 
 const resolveImageUrl = (url?: string | null) => {
   if (!url) return null
@@ -39,6 +35,7 @@ export const InventoryListScreen: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [search, setSearch] = useState('')
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -46,207 +43,248 @@ export const InventoryListScreen: React.FC = () => {
   const [totalItems, setTotalItems] = useState(0)
   const itemsPerPage = 20
 
-  const fetchInventory = useCallback(async (page: number) => {
+  // Edit modal
+  const [editBatch, setEditBatch] = useState<Batch | null>(null)
+  const [editForm, setEditForm] = useState({ batchNumber: '', quantity: '', purchasePrice: '', sellingPrice: '' })
+  const [saving, setSaving] = useState(false)
+
+  const fetchInventory = useCallback(async (page: number, q = search) => {
     try {
       setLoading(true)
-      const response = await inventoryService.getInventory({ page, limit: itemsPerPage })
+      const response = await inventoryService.getInventory({ page, limit: itemsPerPage, search: q })
       setInventory(response.inventory || [])
-      
       const total = response.pagination?.total || 0
       setTotalItems(total)
       setTotalPages(Math.max(1, Math.ceil(total / itemsPerPage)))
       setCurrentPage(page)
-    } catch (error: any) {
-      console.error('Error fetching inventory:', error)
+    } catch {
       showError('Error', 'Failed to fetch inventory data')
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [search])
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchInventory(1)
-    }, [fetchInventory])
-  )
+  const handleSearch = (q: string) => {
+    setSearch(q)
+    fetchInventory(1, q)
+  }
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true)
-    fetchInventory(1)
-  }, [fetchInventory])
+  useFocusEffect(useCallback(() => { fetchInventory(1) }, [fetchInventory]))
 
-  const handlePageChange = (newPage: number) => {
-    fetchInventory(newPage)
+  const onRefresh = useCallback(() => { setRefreshing(true); fetchInventory(1) }, [fetchInventory])
+
+  const handleEdit = (batch: Batch) => {
+    setEditBatch(batch)
+    setEditForm({
+      batchNumber: batch.batchNumber || '',
+      quantity: String(batch.quantity),
+      purchasePrice: String(batch.purchasePrice || ''),
+      sellingPrice: String(batch.sellingPrice || ''),
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editBatch) return
+    setSaving(true)
+    try {
+      const updated = await inventoryService.updateInventory(editBatch.id, {
+        batchNumber: editForm.batchNumber || undefined,
+        quantity: parseInt(editForm.quantity) || undefined,
+        purchasePrice: editForm.purchasePrice ? parseFloat(editForm.purchasePrice) : undefined,
+        sellingPrice: editForm.sellingPrice ? parseFloat(editForm.sellingPrice) : undefined,
+      })
+      setInventory(prev => prev.map(b => b.id === editBatch.id ? { ...b, ...updated } : b))
+      showSuccess('Updated', 'Inventory batch updated')
+      setEditBatch(null)
+    } catch {
+      showError('Error', 'Failed to update batch')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = (batch: Batch) => {
+    Alert.alert(
+      'Delete Batch',
+      `Delete batch ${batch.batchNumber || batch.id}? This will also remove related records.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await inventoryService.deleteInventory(batch.id)
+              setInventory(prev => prev.filter(b => b.id !== batch.id))
+              setTotalItems(t => Math.max(0, t - 1))
+              showSuccess('Deleted', 'Batch deleted')
+            } catch {
+              showError('Error', 'Failed to delete batch')
+            }
+          },
+        },
+      ]
+    )
   }
 
   const handleExportData = () => {
     import('../../utils/exportUtils').then(({ exportToExcel, commonColumns }) => {
-      exportToExcel({
-        data: inventory,
-        columns: commonColumns.inventory,
-        filename: 'inventory_export',
-        reportTitle: 'Inventory Stock Report'
-      }).then(success => {
-        if (success) showSuccess('Export', 'Excel file ready to share')
-      })
+      exportToExcel({ data: inventory, columns: commonColumns.inventory, filename: 'inventory_export', reportTitle: 'Inventory Stock Report' })
+        .then(success => { if (success) showSuccess('Export', 'Excel file ready to share') })
     })
   }
 
-  const handleToggleFilters = () => {
-    showWarning('Filters', 'Advanced filtering functionality will be available in the next release.')
-  }
+  const s = StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    listContainer: { padding: spacing.base, paddingBottom: 80 },
+    inventoryCard: { marginBottom: spacing.md, padding: 0, borderRadius: 16, overflow: 'hidden' },
+    gridCard: { width: '100%' },
+    imageContainer: { width: '100%', height: 180, position: 'relative' },
+    image: { width: '100%', height: '100%', resizeMode: 'cover' },
+    placeholderImage: { width: '100%', height: '100%', backgroundColor: 'rgba(255,255,255,0.02)', alignItems: 'center', justifyContent: 'center' },
+    unitsBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: theme.primary, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 16 },
+    unitsBadgeText: { color: theme.primaryForeground, fontSize: 12, fontWeight: 'bold' },
+    cardContent: { padding: 16 },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+    productName: { fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 4 },
+    brandName: { fontSize: 12, fontWeight: '600', color: theme.primary, textTransform: 'uppercase' },
+    actionsRow: { flexDirection: 'row', gap: 8 },
+    iconBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border, borderRadius: 8 },
+    grid2x2: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 },
+    gridItem: { width: '50%', flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+    gridLabel: { fontSize: 12, color: theme.mutedForeground },
+    gridValue: { fontSize: 12, fontWeight: 'bold', color: theme.text },
+    footerRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.border },
+    sellingLabel: { fontSize: 14, color: theme.mutedForeground },
+    sellingValue: { fontSize: 14, fontWeight: 'bold', color: theme.primary },
+    fab: { position: 'absolute', right: spacing.base, bottom: spacing.base, width: 64, height: 64, borderRadius: 32, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', elevation: 8 },
+    tableHeader: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: theme.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderBottomWidth: 1, borderBottomColor: theme.border, marginTop: 8 },
+    tableHeaderText: { color: theme.mutedForeground, fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
+    tableRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: theme.card, borderBottomWidth: 1, borderBottomColor: theme.border },
+    colPhoto: { flex: 0.8 },
+    colProduct: { flex: 2, paddingRight: 8 },
+    colStock: { flex: 1, alignItems: 'center' },
+    colPrice: { flex: 1, alignItems: 'flex-end' },
+    rowImage: { width: 60, height: 40, borderRadius: 6, resizeMode: 'cover' },
+    rowPlaceholder: { width: 60, height: 40, borderRadius: 6, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center' },
+    rowTitle: { color: theme.text, fontSize: 14, fontWeight: 'bold' },
+    rowSubtitle: { color: theme.mutedForeground, fontSize: 10, marginTop: 2 },
+    rowText: { color: theme.text, fontSize: 12, fontWeight: '600' },
+    rowBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+    rowBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+    // Edit modal
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    modalSheet: { backgroundColor: theme.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+    modalTitle: { fontSize: 20, fontWeight: '800', color: theme.text, marginBottom: 20 },
+    inputLabel: { fontSize: 13, fontWeight: '600', color: theme.text, marginBottom: 6 },
+    input: { borderWidth: 1, borderColor: theme.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: theme.text, backgroundColor: theme.card, marginBottom: 14 },
+    modalActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+    cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.border, alignItems: 'center' },
+    cancelBtnText: { fontSize: 14, fontWeight: '700', color: theme.text },
+    saveBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: theme.primary, alignItems: 'center' },
+    saveBtnText: { fontSize: 14, fontWeight: '700', color: theme.primaryForeground },
+  })
 
-  const handleStockUpdate = (batch: Batch) => {
-    navigation.navigate('StockUpdate', { productId: batch.productId })
-  }
-
-  const handleDelete = (batch: Batch) => {
-    showWarning(
-      'Delete Inventory',
-      `Are you sure you want to delete this inventory record?`,
-      {
-        action: {
-          label: 'Delete',
-          onPress: () => {
-            setInventory(inventory.filter(b => b.id !== batch.id))
-            showSuccess('Deleted', 'Inventory record deleted')
-          }
-        }
-      }
-    )
-  }
-
-  const renderInventoryCard = ({ item: batch }: { item: Batch }) => {
-    return (
-      <Card style={[
-        commonStyles.glassCard, 
-        styles.inventoryCard,
-        viewMode === 'grid' && styles.gridCard
-      ]}>
-        <View style={styles.imageContainer}>
-          {batch.product.imageUrl ? (
-            <Image source={{ uri: resolveImageUrl(batch.product.imageUrl)! }} style={styles.image} />
-          ) : (
-            <View style={styles.placeholderImage}>
-              <Icon name="image" size={48} color={theme.textSecondary} />
-            </View>
-          )}
-          <View style={styles.unitsBadge}>
-            <Text style={styles.unitsBadgeText}>{batch.quantity} units</Text>
+  const renderInventoryCard = ({ item: batch }: { item: Batch }) => (
+    <Card style={[commonStyles.glassCard, s.inventoryCard, viewMode === 'grid' && s.gridCard]}>
+      <View style={s.imageContainer}>
+        {batch.product.imageUrl ? (
+          <Image source={{ uri: resolveImageUrl(batch.product.imageUrl)! }} style={s.image} />
+        ) : (
+          <View style={s.placeholderImage}>
+            <Icon name="image" size={48} color={theme.textSecondary} />
+          </View>
+        )}
+        <View style={s.unitsBadge}>
+          <Text style={s.unitsBadgeText}>{batch.quantity} units</Text>
+        </View>
+      </View>
+      <View style={s.cardContent}>
+        <View style={s.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.productName} numberOfLines={1}>{batch.product.name}</Text>
+            <Text style={s.brandName} numberOfLines={1}>{batch.product.brand.name}</Text>
+          </View>
+          <View style={s.actionsRow}>
+            <TouchableOpacity style={s.iconBtn} onPress={() => handleEdit(batch)}>
+              <Icon name="edit" size={16} color={theme.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.iconBtn, { borderColor: theme.error }]} onPress={() => handleDelete(batch)}>
+              <Icon name="delete-outline" size={16} color={theme.error} />
+            </TouchableOpacity>
           </View>
         </View>
-
-        <View style={styles.cardContent}>
-          <View style={styles.headerRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.productName} numberOfLines={1}>{batch.product.name}</Text>
-              <Text style={styles.brandName} numberOfLines={1}>{batch.product.brand.name}</Text>
-            </View>
-            <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.iconBtn} onPress={() => handleStockUpdate(batch)}>
-                <Icon name="edit" size={16} color={theme.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.iconBtn, { borderColor: theme.error }]} onPress={() => handleDelete(batch)}>
-                <Icon name="delete-outline" size={16} color={theme.error} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.grid2x2}>
-            <View style={styles.gridItem}>
-              <Text style={styles.gridLabel}>Size: </Text>
-              <Text style={styles.gridValue}>{batch.product.size?.name || 'N/A'}</Text>
-            </View>
-            <View style={styles.gridItem}>
-              <Text style={styles.gridLabel}>Cat: </Text>
-              <Text style={styles.gridValue}>{batch.product.category?.name || 'N/A'}</Text>
-            </View>
-            <View style={styles.gridItem}>
-              <Text style={styles.gridLabel}>Batch: </Text>
-              <Text style={styles.gridValue}>{batch.batchNumber || 'N/A'}</Text>
-            </View>
-            <View style={styles.gridItem}>
-              <Text style={styles.gridLabel}>Loc: </Text>
-              <Text style={styles.gridValue}>{batch.location?.name || 'N/A'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.footerRow}>
-            <Text style={styles.sellingLabel}>Selling: </Text>
-            <Text style={styles.sellingValue}>₹{batch.sellingPrice || 0}</Text>
-          </View>
+        <View style={s.grid2x2}>
+          <View style={s.gridItem}><Text style={s.gridLabel}>Size: </Text><Text style={s.gridValue}>{batch.product.size?.name || 'N/A'}</Text></View>
+          <View style={s.gridItem}><Text style={s.gridLabel}>Cat: </Text><Text style={s.gridValue}>{batch.product.category?.name || 'N/A'}</Text></View>
+          <View style={s.gridItem}><Text style={s.gridLabel}>Batch: </Text><Text style={s.gridValue}>{batch.batchNumber || 'N/A'}</Text></View>
+          <View style={s.gridItem}><Text style={s.gridLabel}>Loc: </Text><Text style={s.gridValue}>{batch.location?.name || 'N/A'}</Text></View>
         </View>
-      </Card>
-    )
-  }
+        <View style={s.footerRow}>
+          <Text style={s.sellingLabel}>Selling: </Text>
+          <Text style={s.sellingValue}>₹{batch.sellingPrice || 0}</Text>
+        </View>
+      </View>
+    </Card>
+  )
 
-  const renderInventoryRow = ({ item: batch }: { item: Batch }) => {
-    return (
-      <TouchableOpacity 
-        style={styles.tableRow}
-        onPress={() => handleStockUpdate(batch)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.colPhoto}>
-          {batch.product.imageUrl ? (
-            <Image source={{ uri: resolveImageUrl(batch.product.imageUrl)! }} style={styles.rowImage} />
-          ) : (
-            <View style={styles.rowPlaceholder}>
-              <Icon name="image" size={16} color={theme.textSecondary} />
-            </View>
-          )}
+  const renderInventoryRow = ({ item: batch }: { item: Batch }) => (
+    <TouchableOpacity style={s.tableRow} onPress={() => handleEdit(batch)} activeOpacity={0.7}>
+      <View style={s.colPhoto}>
+        {batch.product.imageUrl ? (
+          <Image source={{ uri: resolveImageUrl(batch.product.imageUrl)! }} style={s.rowImage} />
+        ) : (
+          <View style={s.rowPlaceholder}><Icon name="image" size={16} color={theme.textSecondary} /></View>
+        )}
+      </View>
+      <View style={s.colProduct}>
+        <Text style={s.rowTitle} numberOfLines={1}>{batch.product.name}</Text>
+        <Text style={s.rowSubtitle} numberOfLines={1}>Batch: {batch.batchNumber || 'N/A'}</Text>
+      </View>
+      <View style={s.colStock}>
+        <View style={[s.rowBadge, { backgroundColor: batch.quantity < 10 ? theme.warning : theme.primary }]}>
+          <Text style={s.rowBadgeText}>{batch.quantity} units</Text>
         </View>
-        <View style={styles.colProduct}>
-          <Text style={styles.rowTitle} numberOfLines={1}>{batch.product.name}</Text>
-          <Text style={styles.rowSubtitle} numberOfLines={1}>Batch: {batch.batchNumber || 'N/A'}</Text>
-        </View>
-        <View style={styles.colStock}>
-          <View style={[styles.rowBadge, { backgroundColor: theme.primary }]}>
-            <Text style={styles.rowBadgeText}>{batch.quantity} units</Text>
-          </View>
-        </View>
-        <View style={styles.colPrice}>
-          <Text style={styles.rowText}>₹{batch.sellingPrice || 0}</Text>
-        </View>
-      </TouchableOpacity>
-    )
-  }
+      </View>
+      <View style={s.colPrice}>
+        <Text style={s.rowText}>₹{batch.sellingPrice || 0}</Text>
+      </View>
+    </TouchableOpacity>
+  )
 
-  const renderItem = ({ item }: { item: Batch }) => {
-    if (viewMode === 'list') return renderInventoryRow({ item })
-    return renderInventoryCard({ item })
-  }
+  const renderItem = ({ item }: { item: Batch }) =>
+    viewMode === 'list' ? renderInventoryRow({ item }) : renderInventoryCard({ item })
 
   const renderListHeader = () => {
     if (viewMode !== 'list' || inventory.length === 0) return null
     return (
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableHeaderText, styles.colPhoto]}>PHOTO</Text>
-        <Text style={[styles.tableHeaderText, styles.colProduct]}>PRODUCT</Text>
-        <Text style={[styles.tableHeaderText, styles.colStock]}>STOCK</Text>
-        <Text style={[styles.tableHeaderText, styles.colPrice]}>PRICE</Text>
+      <View style={s.tableHeader}>
+        <Text style={[s.tableHeaderText, s.colPhoto]}>PHOTO</Text>
+        <Text style={[s.tableHeaderText, s.colProduct]}>PRODUCT</Text>
+        <Text style={[s.tableHeaderText, s.colStock]}>STOCK</Text>
+        <Text style={[s.tableHeaderText, s.colPrice]}>PRICE</Text>
       </View>
     )
   }
 
-  const renderSkeletonCard = () => {
+  const renderSkeleton = () => {
     if (viewMode === 'list') {
       return (
-        <View style={styles.tableRow}>
-          <View style={styles.colPhoto}><Skeleton height={40} width={60} borderRadius={6} /></View>
-          <View style={styles.colProduct}><Skeleton height={16} width="80%" /></View>
-          <View style={styles.colStock}><Skeleton height={24} width={60} borderRadius={12} /></View>
-          <View style={styles.colPrice}><Skeleton height={16} width={40} /></View>
+        <View style={s.tableRow}>
+          <View style={s.colPhoto}><Skeleton height={40} width={60} borderRadius={6} /></View>
+          <View style={s.colProduct}><Skeleton height={16} width="80%" /></View>
+          <View style={s.colStock}><Skeleton height={24} width={60} borderRadius={12} /></View>
+          <View style={s.colPrice}><Skeleton height={16} width={40} /></View>
         </View>
       )
     }
     return (
-      <Card style={[commonStyles.glassCard, styles.inventoryCard]}>
+      <Card style={[commonStyles.glassCard, s.inventoryCard]}>
         <View style={{ height: 180, width: '100%', backgroundColor: theme.surface }}>
           <Skeleton height="100%" width="100%" />
         </View>
-        <View style={styles.cardContent}>
+        <View style={s.cardContent}>
           <Skeleton height={24} width="50%" style={{ marginBottom: 16 }} />
           <Skeleton height={60} width="100%" />
         </View>
@@ -254,211 +292,8 @@ export const InventoryListScreen: React.FC = () => {
     )
   }
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.background,
-    },
-    listContainer: {
-      padding: spacing.base,
-      paddingBottom: 80,
-    },
-    inventoryCard: {
-      marginBottom: spacing.md,
-      padding: 0,
-      borderRadius: 16,
-      overflow: 'hidden',
-    },
-    imageContainer: {
-      width: '100%',
-      height: 180,
-      position: 'relative',
-    },
-    image: {
-      width: '100%',
-      height: '100%',
-      resizeMode: 'cover',
-    },
-    placeholderImage: {
-      width: '100%',
-      height: '100%',
-      backgroundColor: 'rgba(255,255,255,0.02)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    unitsBadge: {
-      position: 'absolute',
-      top: 12,
-      right: 12,
-      backgroundColor: theme.primary,
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-      borderRadius: 16,
-    },
-    unitsBadgeText: {
-      color: theme.primaryForeground,
-      fontSize: 12,
-      fontWeight: 'bold',
-    },
-    cardContent: {
-      padding: 16,
-    },
-    headerRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: 16,
-    },
-    productName: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: theme.text,
-      marginBottom: 4,
-    },
-    brandName: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: theme.primary,
-      textTransform: 'uppercase',
-    },
-    actionsRow: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    iconBtn: {
-      width: 32,
-      height: 32,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: theme.border,
-      borderRadius: 8,
-    },
-    grid2x2: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginBottom: 16,
-    },
-    gridItem: {
-      width: '50%',
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    gridLabel: {
-      fontSize: 12,
-      color: theme.mutedForeground,
-    },
-    gridValue: {
-      fontSize: 12,
-      fontWeight: 'bold',
-      color: theme.text,
-    },
-    footerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingTop: 12,
-      borderTopWidth: 1,
-      borderTopColor: theme.border,
-    },
-    sellingLabel: {
-      fontSize: 14,
-      color: theme.mutedForeground,
-    },
-    sellingValue: {
-      fontSize: 14,
-      fontWeight: 'bold',
-      color: theme.primary,
-    },
-    fab: {
-      position: 'absolute',
-      right: spacing.base,
-      bottom: spacing.base,
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      backgroundColor: theme.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      elevation: 8,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-    },
-    tableHeader: {
-      flexDirection: 'row',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: theme.surface,
-      borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
-      marginTop: 8,
-    },
-    tableHeaderText: {
-      color: theme.mutedForeground,
-      fontSize: 10,
-      fontWeight: 'bold',
-      letterSpacing: 1,
-    },
-    tableRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: theme.card,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
-    },
-    colPhoto: { flex: 0.8 },
-    colProduct: { flex: 2, paddingRight: 8 },
-    colStock: { flex: 1, alignItems: 'center' },
-    colPrice: { flex: 1, alignItems: 'flex-end' },
-    rowImage: {
-      width: 60,
-      height: 40,
-      borderRadius: 6,
-      resizeMode: 'cover',
-    },
-    rowPlaceholder: {
-      width: 60,
-      height: 40,
-      borderRadius: 6,
-      backgroundColor: theme.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    rowTitle: {
-      color: theme.text,
-      fontSize: 14,
-      fontWeight: 'bold',
-    },
-    rowSubtitle: {
-      color: theme.mutedForeground,
-      fontSize: 10,
-      marginTop: 2,
-    },
-    rowText: {
-      color: theme.text,
-      fontSize: 12,
-      fontWeight: '600',
-    },
-    rowBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
-    },
-    rowBadgeText: {
-      color: '#fff',
-      fontSize: 10,
-      fontWeight: 'bold',
-    },
-  })
-
   return (
-    <SafeAreaView style={styles.container} edges={['right', 'left']}>
+    <SafeAreaView style={s.container} edges={['right', 'left']}>
       <MainHeader />
       <ScreenActionBar
         title="Inventory"
@@ -468,14 +303,33 @@ export const InventoryListScreen: React.FC = () => {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onExport={handleExportData}
-        onToggleFilters={handleToggleFilters}
+        onToggleFilters={() => showWarning('Filters', 'Advanced filtering coming soon.')}
       />
-      
+      {/* Search bar */}
+      <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
+        <View style={[s.input, { flexDirection: 'row', alignItems: 'center', gap: 8, height: 42, paddingVertical: 0 }]}>
+          <Icon name="search" size={18} color={theme.mutedForeground} />
+          <RNTextInput
+            style={{ flex: 1, fontSize: 14, color: theme.text }}
+            placeholder="Search inventory..."
+            placeholderTextColor={theme.mutedForeground}
+            value={search}
+            onChangeText={handleSearch}
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => handleSearch('')}>
+              <Icon name="close" size={16} color={theme.mutedForeground} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       <FlatList
         data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : inventory}
-        renderItem={loading ? renderSkeletonCard : renderItem}
+        renderItem={loading ? renderSkeleton : renderItem}
         keyExtractor={(item, index) => loading ? `skel-${index}` : item.id}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={s.listContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListHeaderComponent={renderListHeader}
@@ -486,18 +340,71 @@ export const InventoryListScreen: React.FC = () => {
               totalPages={totalPages}
               totalItems={totalItems}
               itemsPerPage={itemsPerPage}
-              onPageChange={handlePageChange}
+              onPageChange={p => fetchInventory(p)}
             />
           ) : null
         }
       />
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('StockUpdate', { productId: '' })}
-      >
+      <TouchableOpacity style={s.fab} onPress={() => navigation.navigate('StockUpdate', { productId: '' })}>
         <Icon name="add" size={24} color={theme.textInverse} />
       </TouchableOpacity>
+
+      {/* Inline Edit Modal */}
+      <Modal visible={!!editBatch} transparent animationType="slide" onRequestClose={() => setEditBatch(null)}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setEditBatch(null)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={s.modalSheet}>
+              <Text style={s.modalTitle}>Edit Inventory Batch</Text>
+              <Text style={s.inputLabel}>Batch Number</Text>
+              <RNTextInput
+                style={s.input}
+                value={editForm.batchNumber}
+                onChangeText={t => setEditForm(p => ({ ...p, batchNumber: t }))}
+                placeholderTextColor={theme.mutedForeground}
+              />
+              <Text style={s.inputLabel}>Quantity</Text>
+              <RNTextInput
+                style={s.input}
+                value={editForm.quantity}
+                onChangeText={t => setEditForm(p => ({ ...p, quantity: t }))}
+                keyboardType="number-pad"
+                placeholderTextColor={theme.mutedForeground}
+              />
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.inputLabel}>Purchase Price</Text>
+                  <RNTextInput
+                    style={s.input}
+                    value={editForm.purchasePrice}
+                    onChangeText={t => setEditForm(p => ({ ...p, purchasePrice: t }))}
+                    keyboardType="decimal-pad"
+                    placeholderTextColor={theme.mutedForeground}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.inputLabel}>Selling Price</Text>
+                  <RNTextInput
+                    style={s.input}
+                    value={editForm.sellingPrice}
+                    onChangeText={t => setEditForm(p => ({ ...p, sellingPrice: t }))}
+                    keyboardType="decimal-pad"
+                    placeholderTextColor={theme.mutedForeground}
+                  />
+                </View>
+              </View>
+              <View style={s.modalActions}>
+                <TouchableOpacity style={s.cancelBtn} onPress={() => setEditBatch(null)}>
+                  <Text style={s.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSaveEdit} disabled={saving}>
+                  <Text style={s.saveBtnText}>{saving ? 'Saving...' : 'Save Changes'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   )
 }

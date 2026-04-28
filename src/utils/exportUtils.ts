@@ -110,9 +110,6 @@ export const exportToExcel = async ({
   }
 }
 
-// ─── Export Column Definitions ────────────────────────────────────────────────
-// Kept exactly the same as the web implementation for 100% data parity.
-
 export const commonColumns = {
   product: [
     { key: 'name', label: 'Product Name' },
@@ -121,7 +118,6 @@ export const commonColumns = {
     { key: 'size.name', label: 'Size' },
     { key: 'sqftPerBox', label: 'Sq Ft/Box', format: (v: number) => v?.toString() || '0' },
     { key: 'pcsPerBox', label: 'Pcs/Box', format: (v: number) => v?.toString() || '0' },
-    { key: 'stockQuantity', label: 'Stock Qty', format: (v: number) => v?.toString() || '0' },
     { key: 'isActive', label: 'Status', format: (v: boolean) => v ? 'Active' : 'Inactive' },
     { key: 'createdAt', label: 'Created Date', format: (v: string) => formatDateDDMMMYYYY(v) }
   ] as ExportColumn[],
@@ -131,25 +127,23 @@ export const commonColumns = {
     { key: 'batchNumber', label: 'Batch #' },
     { key: 'location.name', label: 'Location' },
     { key: 'quantity', label: 'Qty', format: (v: number) => v?.toString() || '0' },
-    { key: 'unit', label: 'Unit' },
-    { key: 'buyingPrice', label: 'Buying Price', format: (v: number) => `₹${v?.toLocaleString() || 0}` },
+    { key: 'purchasePrice', label: 'Purchase Price', format: (v: number) => `₹${v?.toLocaleString() || 0}` },
     { key: 'sellingPrice', label: 'Selling Price', format: (v: number) => `₹${v?.toLocaleString() || 0}` },
     { key: 'createdAt', label: 'Added Date', format: (v: string) => formatDateDDMMMYYYY(v) }
   ] as ExportColumn[],
 
   salesOrder: [
     { key: 'orderNumber', label: 'Order #' },
-    { key: 'customerName', label: 'Customer' },
+    { key: 'brand.name', label: 'Brand' },
     { key: 'status', label: 'Status' },
     { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${v?.toLocaleString() || 0}` },
     { key: 'orderDate', label: 'Order Date', format: (v: string) => formatDateDDMMMYYYY(v) },
-    { key: 'items.length', label: 'Unique Items', format: (v: number) => v?.toString() || '0' },
     { key: 'createdAt', label: 'Created At', format: (v: string) => formatDateDDMMMYYYY(v) }
   ] as ExportColumn[],
 
   purchaseOrder: [
     { key: 'orderNumber', label: 'Order #' },
-    { key: 'supplierName', label: 'Supplier' },
+    { key: 'brand.name', label: 'Brand' },
     { key: 'status', label: 'Status' },
     { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${v?.toLocaleString() || 0}` },
     { key: 'orderDate', label: 'Order Date', format: (v: string) => formatDateDDMMMYYYY(v) },

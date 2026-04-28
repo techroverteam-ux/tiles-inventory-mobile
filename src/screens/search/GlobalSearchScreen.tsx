@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
-import { Header } from '../../components/navigation/Header'
+import { MainHeader } from '../../components/navigation/MainHeader'
 import { LoadingSpinner } from '../../components/loading'
 import { globalSearchService, GlobalSearchResult } from '../../services/api/ApiServices'
 import { spacing, typography, borderRadius } from '../../theme'
@@ -314,16 +314,7 @@ export const GlobalSearchScreen: React.FC<GlobalSearchScreenProps> = ({ navigati
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header
-        title="Global Search"
-        showBack
-        navigation={navigation}
-        rightComponent={
-          <TouchableOpacity onPress={toggleTheme} style={{ padding: spacing.sm }}>
-            <Icon name={isDark ? 'wb-sunny' : 'nightlight-round'} size={22} color={theme.text} />
-          </TouchableOpacity>
-        }
-      />
+      <MainHeader />
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
           <Icon

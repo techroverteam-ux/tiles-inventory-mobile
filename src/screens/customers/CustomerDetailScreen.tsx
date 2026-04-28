@@ -59,21 +59,22 @@ export const CustomerDetailScreen: React.FC<CustomerDetailScreenProps> = ({ rout
     }
 
     try {
-      // Mock data for now - in production, call customerService.getCustomer(customerId)
+      const { customerService } = await import('../../services/api/ApiServices')
+      const data = await customerService.getCustomer(customerId)
       setCustomer({
-        id: customerId,
-        name: 'Customer Name',
-        email: 'customer@example.com',
-        phone: '+91-XXXXXXXXXX',
-        address: '123 Main Street',
-        city: 'City Name',
-        state: 'State',
-        country: 'India',
-        pincode: '123456',
-        gstin: 'XX XXXXXXXXXXXXXXX',
-        totalOrders: 5,
-        totalOrderValue: 50000,
-        createdAt: new Date().toISOString(),
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        address: data.address,
+        city: undefined,
+        state: undefined,
+        country: undefined,
+        pincode: undefined,
+        gstin: undefined,
+        totalOrders: undefined,
+        totalOrderValue: undefined,
+        createdAt: data.createdAt,
       })
     } catch (error) {
       console.error('Failed to load customer details:', error)
