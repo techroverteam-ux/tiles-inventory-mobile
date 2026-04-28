@@ -2,6 +2,7 @@ import React from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
+import { getCommonStyles } from '../../theme/commonStyles'
 
 interface HeaderProps {
   title: string
@@ -21,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   rightComponent,
 }) => {
   const { theme } = useTheme()
+  const commonStyles = getCommonStyles(theme)
 
   const styles = StyleSheet.create({
     container: {
@@ -28,8 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: theme.surface,
+      paddingVertical: 14,
       borderBottomWidth: 1,
       borderBottomColor: theme.border,
     },
@@ -55,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
   })
 
   return (
-    <View style={styles.container}>
+    <View style={[commonStyles.glass, styles.container, { borderWidth: 0, borderBottomWidth: 1 }]}>
       <View style={styles.leftSection}>
         {showBack && (
           <TouchableOpacity

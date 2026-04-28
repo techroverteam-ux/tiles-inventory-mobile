@@ -1,585 +1,261 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  TouchableOpacity,
-  Image
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
 } from 'react-native'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
-import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker'
+import { launchImageLibrary, MediaType } from 'react-native-image-picker'
 import Icon from 'react-native-vector-icons/MaterialIcons'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '../../context/ThemeContext'
-import { Card } from '../../components/common/Card'
-import { TextInput } from '../../components/common/TextInput'
-import { LoadingButton } from '../../components/common/LoadingButton'
 import { SelectModal } from '../../components/common/SelectModal'
-import { spacing, typography, borderRadius } from '../../theme'
+import { FormField, FormRow, SectionBox, FormActions } from '../../components/common/FormComponents'
 import { MainStackParamList } from '../../navigation/types'
 import {
-  productService,
-  brandService,
-  categoryService,
-  collectionService,
-  sizeService,
-  finishTypeService,
-  locationService,
-  Brand,
-  Category,
-  Collection,
-  Size,
-  FinishType,
-  Location,
-  CreateProductRequest
+  productService, brandService, categoryService, sizeService,
+  Brand, Category, Size, CreateProductRequest,
 } from '../../services/api/ApiServices'
 
 type ProductFormRouteProp = RouteProp<MainStackParamList, 'ProductForm'>
 
-interface FormData {
+interface ProductEntry {
   name: string
-  code: string
-  description: string
   brandId: string
   categoryId: string
-  collectionId: string
   sizeId: string
-  finishTypeId: string
-  length: string
-  width: string
-  thickness: string
   sqftPerBox: string
   pcsPerBox: string
-  locationId: string
-  batchName: string
-  stock: string
-  image: File | null
+  image: any
+  imageUri: string | null
 }
 
-interface FormErrors {
-  [key: string]: string
-}
+const emptyEntry = (): ProductEntry => ({
+  name: '', brandId: '', categoryId: '', sizeId: '',
+  sqftPerBox: '', pcsPerBox: '', image: null, imageUri: null,
+})
 
 export const ProductFormScreen: React.FC = () => {
   const { theme } = useTheme()
   const navigation = useNavigation()
   const route = useRoute<ProductFormRouteProp>()
   const { productId } = route.params || {}
-  
-  const [formData, setFormData] = useState<FormData>({
-    name: '',
-    code: '',
-    description: '',
-    brandId: '',
-    categoryId: '',
-    collectionId: '',
-    sizeId: '',
-    finishTypeId: '',
-    length: '',
-    width: '',
-    thickness: '',
-    sqftPerBox: '1',
-    pcsPerBox: '1',
-    locationId: '',
-    batchName: '',
-    stock: '0',
-    image: null
-  })
-  
-  const [errors, setErrors] = useState<FormErrors>({})
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [imageUri, setImageUri] = useState<string | null>(null)
-  
-  // Master data
+
+  const [formData, setFormData] = useState<ProductEntry>(emptyEntry())
+  const [queued, setQueued] = useState<ProductEntry[]>([])
   const [brands, setBrands] = useState<Brand[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [filteredCategories, setFilteredCategories] = useState<Category[]>([])
-  const [collections, setCollections] = useState<any[]>([])
-  const [filteredCollections, setFilteredCollections] = useState<any[]>([])
   const [sizes, setSizes] = useState<Size[]>([])
-  const [filteredSizes, setFilteredSizes] = useState<Size[]>([])
-  const [finishTypes, setFinishTypes] = useState<FinishType[]>([])
-  const [locations, setLocations] = useState<Location[]>([])
+  const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const fetchMasterData = useCallback(async () => {
-    setLoading(true)
     try {
-      const [brandsRes, categoriesRes, collectionsRes, sizesRes, finishTypesRes, locationsRes] = await Promise.all([
-        brandService.getBrands(),
-        categoryService.getCategories(),
-        collectionService.getCollections(),
-        sizeService.getSizes(),
-        finishTypeService.getFinishTypes(),
-        locationService.getLocations()
+      const [b, c, s] = await Promise.all([
+        brandService.getBrands(), categoryService.getCategories(), sizeService.getSizes(),
       ])
-
-      setBrands(brandsRes.brands.filter(b => b.isActive))
-      setCategories(categoriesRes.categories.filter(c => c.isActive))
-      setCollections(collectionsRes.collections.filter(c => c.isActive))
-      setSizes(sizesRes.sizes.filter(s => s.isActive))
-      setFinishTypes(finishTypesRes.finishTypes.filter(f => f.isActive))
-      setLocations(locationsRes.locations.filter(l => l.isActive))
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load form data')
-    } finally {
-      setLoading(false)
-    }
+      setBrands(b.brands.filter(x => x.isActive))
+      setCategories(c.categories.filter(x => x.isActive))
+      setSizes(s.sizes.filter(x => x.isActive))
+    } catch { Alert.alert('Error', 'Failed to load form data') }
   }, [])
 
-  useEffect(() => {
-    fetchMasterData()
-  }, [fetchMasterData])
+  useEffect(() => { fetchMasterData() }, [fetchMasterData])
 
-  // Filter categories when brand changes
-  useEffect(() => {
-    if (formData.brandId) {
-      categoryService.getCategories(formData.brandId)
-        .then(res => setFilteredCategories(res.categories.filter(c => c.isActive)))
-        .catch(() => setFilteredCategories(categories))
-    } else {
-      setFilteredCategories(categories)
-    }
-  }, [formData.brandId, categories])
+  const update = (field: keyof ProductEntry, value: any) => {
+    setFormData(p => ({ ...p, [field]: value }))
+    if (errors[field]) setErrors(p => ({ ...p, [field]: '' }))
+  }
 
-  // Filter collections when brand/category changes
-  useEffect(() => {
-    if (formData.brandId && formData.categoryId) {
-      collectionService.getCollections(formData.brandId, formData.categoryId)
-        .then(res => setFilteredCollections(res.collections.filter(c => c.isActive)))
-        .catch(() => setFilteredCollections(collections))
-    } else {
-      setFilteredCollections(collections)
-    }
-  }, [formData.brandId, formData.categoryId, collections])
-
-  // Filter sizes when brand/category changes
-  useEffect(() => {
-    if (formData.brandId && formData.categoryId) {
-      sizeService.getSizes(formData.brandId, formData.categoryId)
-        .then(res => setFilteredSizes(res.sizes.filter(s => s.isActive)))
-        .catch(() => setFilteredSizes(sizes))
-    } else {
-      setFilteredSizes(sizes)
-    }
-  }, [formData.brandId, formData.categoryId, sizes])
-
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {}
-
-    if (!formData.name.trim()) newErrors.name = 'Product name is required'
-    if (!formData.code.trim()) newErrors.code = 'Product code is required'
-    if (!formData.brandId) newErrors.brandId = 'Brand is required'
-    if (!formData.categoryId) newErrors.categoryId = 'Category is required'
-    if (!formData.finishTypeId) newErrors.finishTypeId = 'Finish type is required'
-    if (!formData.locationId) newErrors.locationId = 'Location is required'
-    if (!formData.batchName.trim()) newErrors.batchName = 'Batch name is required'
-    
-    const stockNum = parseInt(formData.stock)
-    if (isNaN(stockNum) || stockNum < 0) {
-      newErrors.stock = 'Valid stock quantity is required'
-    }
-
-    const sqftNum = parseFloat(formData.sqftPerBox)
-    if (isNaN(sqftNum) || sqftNum <= 0) {
-      newErrors.sqftPerBox = 'Valid sq ft per box is required'
-    }
-
-    const pcsNum = parseInt(formData.pcsPerBox)
-    if (isNaN(pcsNum) || pcsNum <= 0) {
-      newErrors.pcsPerBox = 'Valid pieces per box is required'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+  const validate = (entry: ProductEntry) => {
+    const e: Record<string, string> = {}
+    if (!entry.name.trim()) e.name = 'Product name is required'
+    if (!entry.brandId) e.brandId = 'Brand is required'
+    if (!entry.categoryId) e.categoryId = 'Category is required'
+    setErrors(e)
+    return Object.keys(e).length === 0
   }
 
   const handleImagePicker = () => {
-    const options = {
-      mediaType: 'photo' as MediaType,
-      includeBase64: false,
-      maxHeight: 2000,
-      maxWidth: 2000,
-      quality: 0.8 as any,
-    }
-
-    launchImageLibrary(options, (response: ImagePickerResponse) => {
-      if (response.didCancel || response.errorMessage) {
-        return
-      }
-
-      if (response.assets && response.assets[0]) {
-        const asset = response.assets[0]
-        setImageUri(asset.uri || null)
-        
-        // Create File object for upload
-        if (asset.uri && asset.fileName && asset.type) {
-          const file = {
-            uri: asset.uri,
-            type: asset.type,
-            name: asset.fileName,
-          } as any
-          setFormData(prev => ({ ...prev, image: file }))
-        }
+    launchImageLibrary({ mediaType: 'photo' as MediaType, quality: 0.8 as any }, (res) => {
+      if (res.assets?.[0]) {
+        const asset = res.assets[0]
+        update('imageUri', asset.uri || null)
+        update('image', { uri: asset.uri, type: asset.type, name: asset.fileName })
       }
     })
   }
 
-  const handleSave = async () => {
-    if (!validateForm()) {
-      Alert.alert('Validation Error', 'Please fix the errors and try again')
-      return
-    }
+  const handleAddMore = () => {
+    if (!validate(formData)) return
+    setQueued(q => [...q, { ...formData }])
+    setFormData(emptyEntry())
+    setErrors({})
+  }
 
+  const removeQueued = (i: number) => setQueued(q => q.filter((_, j) => j !== i))
+
+  const saveEntry = async (entry: ProductEntry) => {
+    const data: CreateProductRequest = {
+      name: entry.name.trim(),
+      code: '',
+      brandId: entry.brandId,
+      categoryId: entry.categoryId,
+      sizeId: entry.sizeId || undefined,
+      sqftPerBox: entry.sqftPerBox ? parseFloat(entry.sqftPerBox) : undefined,
+      pcsPerBox: entry.pcsPerBox ? parseInt(entry.pcsPerBox) : undefined,
+      image: entry.image || undefined,
+    }
+    if (productId) {
+      await productService.updateProduct(productId, data)
+    } else {
+      await productService.createProduct(data)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!validate(formData)) return
     setSaving(true)
     try {
-      const productData: CreateProductRequest = {
-        name: formData.name.trim(),
-        code: formData.code.trim(),
-        description: formData.description.trim() || undefined,
-        brandId: formData.brandId,
-        categoryId: formData.categoryId,
-        collectionId: formData.collectionId || undefined,
-        sizeId: formData.sizeId || undefined,
-        length: formData.length ? parseFloat(formData.length) : undefined,
-        width: formData.width ? parseFloat(formData.width) : undefined,
-        thickness: formData.thickness ? parseFloat(formData.thickness) : undefined,
-        sqftPerBox: parseFloat(formData.sqftPerBox),
-        pcsPerBox: parseInt(formData.pcsPerBox),
-        locationId: formData.locationId,
-        batchName: formData.batchName.trim(),
-        stock: parseInt(formData.stock),
-        image: formData.image || undefined
-      }
-
-      if (productId) {
-        // Update existing product
-        await productService.updateProduct(productId, productData)
-        Alert.alert('Success', 'Product updated successfully', [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ])
-      } else {
-        // Create new product
-        await productService.createProduct(productData)
-        Alert.alert('Success', 'Product created successfully', [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ])
-      }
-    } catch (error: any) {
-      console.error('Save product error:', error)
-      Alert.alert('Error', error.response?.data?.error || 'Failed to save product')
+      const all = [...queued, formData]
+      for (const entry of all) await saveEntry(entry)
+      const count = all.length
+      Alert.alert('Success', productId ? 'Product updated' : `${count} product${count > 1 ? 's' : ''} created`, [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ])
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data?.error || 'Failed to save product')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleCancel = () => {
-    navigation.goBack()
-  }
+  const submitLabel = (() => {
+    const count = queued.length + 1
+    if (productId) return saving ? 'Updating...' : 'Update Product'
+    return saving ? 'Creating...' : count > 1 ? `Create ${count} Products` : 'Create Product'
+  })()
 
-  const updateFormData = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }))
-    }
-  }
-
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.background,
+  const s = StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    scroll: { padding: 20, paddingBottom: 100 },
+    backBtn: { padding: 4, marginBottom: 8 },
+    pageTitle: { fontSize: 22, fontWeight: '700', color: theme.primary, marginBottom: 20 },
+    queuedBox: {
+      borderWidth: 1, borderColor: theme.border, borderRadius: 10,
+      backgroundColor: theme.surface, marginBottom: 16, overflow: 'hidden',
     },
-    scrollContainer: {
-      padding: spacing.base,
+    queuedHeader: { fontSize: 11, fontWeight: '700', color: theme.mutedForeground, padding: 10, paddingBottom: 4 },
+    queuedItem: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingHorizontal: 10, paddingVertical: 8,
+      borderTopWidth: 1, borderTopColor: theme.border,
     },
-    formCard: {
-      marginBottom: spacing.base,
+    queuedThumb: { width: 32, height: 32, borderRadius: 6, backgroundColor: theme.muted },
+    queuedName: { flex: 1, fontSize: 13, fontWeight: '600', color: theme.text },
+    imageUpload: {
+      borderWidth: 1.5, borderColor: theme.border, borderStyle: 'dashed',
+      borderRadius: 12, height: 140, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: theme.surface, marginBottom: 16, overflow: 'hidden',
     },
-    formGroup: {
-      marginBottom: spacing.base,
-    },
-    label: {
-      fontSize: typography.fontSize.sm,
-      fontWeight: typography.fontWeight.medium,
-      color: theme.text,
-      marginBottom: spacing.sm,
-    },
-    required: {
-      color: theme.danger,
-    },
-    imageSection: {
-      alignItems: 'center',
-      marginBottom: spacing.lg,
-    },
-    imageContainer: {
-      width: 120,
-      height: 120,
-      borderRadius: borderRadius.base,
-      backgroundColor: theme.gray100,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: spacing.base,
-      overflow: 'hidden',
-    },
-    productImage: {
-      width: '100%',
-      height: '100%',
-    },
-    imageButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-    },
-    imageButtonText: {
-      fontSize: typography.fontSize.sm,
-      color: theme.primary,
-      fontWeight: typography.fontWeight.medium,
-    },
-    formRow: {
-      flexDirection: 'row',
-      gap: spacing.base,
-    },
-    formRowItem: {
-      flex: 1,
-    },
-    actionButtons: {
-      flexDirection: 'row',
-      gap: spacing.base,
-      marginTop: spacing.lg,
-    },
-    cancelButton: {
-      flex: 1,
-    },
-    saveButton: {
-      flex: 1,
-    },
+    uploadImg: { width: '100%', height: '100%', resizeMode: 'cover' },
+    uploadText: { fontSize: 13, color: theme.text, marginTop: 6, textAlign: 'center', paddingHorizontal: 16 },
+    uploadBold: { fontWeight: '700' },
+    uploadSub: { fontSize: 11, color: theme.mutedForeground, marginTop: 3 },
+    labelOpt: { fontSize: 13, fontWeight: '600', color: theme.text, marginBottom: 8 },
+    removeImg: { position: 'absolute', top: 6, right: 6, backgroundColor: theme.error, borderRadius: 12, padding: 2 },
   })
 
-  if (loading) {
-    return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ color: theme.text }}>Loading form data...</Text>
-      </View>
-    )
-  }
-
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        <Card style={styles.formCard} padding="lg">
-          {/* Image Upload Section */}
-          <View style={styles.imageSection}>
-            <TouchableOpacity
-              style={styles.imageContainer}
-              onPress={handleImagePicker}
-            >
-              {imageUri ? (
-                <Image source={{ uri: imageUri }} style={styles.productImage} />
-              ) : (
-                <Icon name="add-a-photo" size={40} color={theme.textSecondary} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.imageButton} onPress={handleImagePicker}>
-              <Icon name="camera-alt" size={20} color={theme.primary} />
-              <Text style={styles.imageButtonText}>
-                {imageUri ? 'Change Photo' : 'Add Photo'}
-              </Text>
-            </TouchableOpacity>
+    <SafeAreaView style={s.container} edges={['top', 'right', 'left', 'bottom']}>
+      <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
+          <Icon name="arrow-back" size={24} color={theme.text} />
+        </TouchableOpacity>
+        <Text style={s.pageTitle}>{productId ? 'Edit Product' : 'Add New Product'}</Text>
+
+        {/* Queued items */}
+        {queued.length > 0 && (
+          <View style={s.queuedBox}>
+            <Text style={s.queuedHeader}>QUEUED ({queued.length})</Text>
+            {queued.map((q, i) => (
+              <View key={i} style={s.queuedItem}>
+                {q.imageUri
+                  ? <Image source={{ uri: q.imageUri }} style={s.queuedThumb} />
+                  : <View style={[s.queuedThumb, { alignItems: 'center', justifyContent: 'center' }]}>
+                      <Icon name="image" size={16} color={theme.mutedForeground} />
+                    </View>
+                }
+                <Text style={s.queuedName} numberOfLines={1}>{q.name}</Text>
+                <TouchableOpacity onPress={() => removeQueued(i)}>
+                  <Icon name="close" size={18} color={theme.mutedForeground} />
+                </TouchableOpacity>
+              </View>
+            ))}
           </View>
+        )}
 
-          {/* Basic Information */}
-          <TextInput
-            label="Product Name"
-            value={formData.name}
-            onChangeText={(value) => updateFormData('name', value)}
-            placeholder="Enter product name"
-            required
-            error={errors.name}
-          />
+        <FormField
+          label="Name" required
+          value={formData.name}
+          onChangeText={(t) => update('name', t)}
+          placeholder="Enter product name"
+          error={errors.name}
+        />
 
-          <TextInput
-            label="Product Code"
-            value={formData.code}
-            onChangeText={(value) => updateFormData('code', value)}
-            placeholder="Enter product code"
-            required
-            error={errors.code}
-          />
-
-          {/* Brand and Category */}
-          <SelectModal
-            label="Brand"
-            value={formData.brandId}
-            options={brands}
-            onSelect={(value) => updateFormData('brandId', value)}
-            placeholder="Select a brand"
-            required
-            error={errors.brandId}
-          />
-
-          <SelectModal
-            label="Category"
-            value={formData.categoryId}
-            options={filteredCategories}
-            onSelect={(value) => updateFormData('categoryId', value)}
-            placeholder="Select a category"
-            required
-            disabled={!formData.brandId}
-            error={errors.categoryId}
-          />
-
-          <SelectModal
-            label="Collection"
-            value={formData.collectionId}
-            options={filteredCollections}
-            onSelect={(value) => updateFormData('collectionId', value)}
-            placeholder="Select collection (optional)"
-            disabled={!formData.categoryId}
-          />
-
-          <TextInput
-            label="Description"
-            value={formData.description}
-            onChangeText={(value) => updateFormData('description', value)}
-            placeholder="Enter product description (optional)"
-            multiline
-            numberOfLines={3}
-          />
-
-          {/* Dimensions */}
-          <View style={styles.formRow}>
-            <View style={styles.formRowItem}>
-              <TextInput
-                label="Length (mm)"
-                value={formData.length}
-                onChangeText={(value) => updateFormData('length', value)}
-                placeholder="0"
-                keyboardType="decimal-pad"
-              />
-            </View>
-            <View style={styles.formRowItem}>
-              <TextInput
-                label="Width (mm)"
-                value={formData.width}
-                onChangeText={(value) => updateFormData('width', value)}
-                placeholder="0"
-                keyboardType="decimal-pad"
-              />
-            </View>
+        <FormRow>
+          <View style={{ flex: 1 }}>
+            <SelectModal label="Brand" value={formData.brandId} options={brands}
+              onSelect={(v) => update('brandId', v)} placeholder="Select a brand" required error={errors.brandId} />
           </View>
-
-          <TextInput
-            label="Thickness (mm)"
-            value={formData.thickness}
-            onChangeText={(value) => updateFormData('thickness', value)}
-            placeholder="0"
-            keyboardType="decimal-pad"
-          />
-
-          {/* Size and Finish Type */}
-          <View style={styles.formRow}>
-            <View style={styles.formRowItem}>
-              <SelectModal
-                label="Size"
-                value={formData.sizeId}
-                options={filteredSizes}
-                onSelect={(value) => updateFormData('sizeId', value)}
-                placeholder="Select size (optional)"
-                disabled={!formData.categoryId}
-              />
-            </View>
-            <View style={styles.formRowItem}>
-              <SelectModal
-                label="Finish Type"
-                value={formData.finishTypeId}
-                options={finishTypes}
-                onSelect={(value) => updateFormData('finishTypeId', value)}
-                placeholder="Select finish type"
-                required
-                error={errors.finishTypeId}
-              />
-            </View>
+          <View style={{ flex: 1 }}>
+            <SelectModal label="Category" value={formData.categoryId} options={categories}
+              onSelect={(v) => update('categoryId', v)} placeholder="Select a category" required error={errors.categoryId} />
           </View>
+        </FormRow>
 
-          {/* Box Information */}
-          <View style={styles.formRow}>
-            <View style={styles.formRowItem}>
-              <TextInput
-                label="Sq Ft per Box"
-                value={formData.sqftPerBox}
-                onChangeText={(value) => updateFormData('sqftPerBox', value)}
-                placeholder="1.0"
-                keyboardType="decimal-pad"
-                error={errors.sqftPerBox}
-              />
+        <SelectModal label="Size" value={formData.sizeId} options={sizes}
+          onSelect={(v) => update('sizeId', v)} placeholder="Select a size" />
+
+        <SectionBox>
+          <FormRow>
+            <View style={{ flex: 1 }}>
+              <FormField label="Sq Ft per Box" leftIcon="crop-square"
+                value={formData.sqftPerBox} onChangeText={(t) => update('sqftPerBox', t)}
+                placeholder="Enter sq ft" keyboardType="decimal-pad" />
             </View>
-            <View style={styles.formRowItem}>
-              <TextInput
-                label="Pieces per Box"
-                value={formData.pcsPerBox}
-                onChangeText={(value) => updateFormData('pcsPerBox', value)}
-                placeholder="1"
-                keyboardType="number-pad"
-                error={errors.pcsPerBox}
-              />
+            <View style={{ flex: 1 }}>
+              <FormField label="Pieces per Box" leftIcon="grid-view"
+                value={formData.pcsPerBox} onChangeText={(t) => update('pcsPerBox', t)}
+                placeholder="Enter pieces" keyboardType="number-pad" />
             </View>
-          </View>
+          </FormRow>
+        </SectionBox>
 
-          {/* Inventory Information */}
-          <SelectModal
-            label="Location"
-            value={formData.locationId}
-            options={locations}
-            onSelect={(value) => updateFormData('locationId', value)}
-            placeholder="Select location"
-            required
-            error={errors.locationId}
-          />
+        <Text style={s.labelOpt}>Product Image <Text style={{ fontWeight: '400', color: theme.mutedForeground }}>(Optional)</Text></Text>
+        <TouchableOpacity style={s.imageUpload} onPress={handleImagePicker}>
+          {formData.imageUri ? (
+            <>
+              <Image source={{ uri: formData.imageUri }} style={s.uploadImg} />
+              <TouchableOpacity style={s.removeImg} onPress={() => { update('imageUri', null); update('image', null) }}>
+                <Icon name="close" size={14} color="#fff" />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Icon name="image" size={32} color={theme.mutedForeground} />
+              <Text style={s.uploadText}><Text style={s.uploadBold}>Click to upload</Text>, drag & drop, or paste an image</Text>
+              <Text style={s.uploadSub}>PNG, JPG, GIF up to 5MB</Text>
+            </>
+          )}
+        </TouchableOpacity>
 
-          <TextInput
-            label="Batch Name"
-            value={formData.batchName}
-            onChangeText={(value) => updateFormData('batchName', value)}
-            placeholder="Enter batch name"
-            required
-            error={errors.batchName}
-          />
-
-          <TextInput
-            label="Initial Stock"
-            value={formData.stock}
-            onChangeText={(value) => updateFormData('stock', value)}
-            placeholder="0"
-            keyboardType="number-pad"
-            required
-            error={errors.stock}
-          />
-
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            <LoadingButton
-              title="Cancel"
-              onPress={handleCancel}
-              variant="outline"
-              style={styles.cancelButton}
-              disabled={saving}
-            />
-            <LoadingButton
-              title={productId ? 'Update Product' : 'Create Product'}
-              onPress={handleSave}
-              variant="primary"
-              loading={saving}
-              style={styles.saveButton}
-            />
-          </View>
-        </Card>
+        <FormActions
+          submitLabel={submitLabel}
+          onSubmit={handleSave}
+          onCancel={() => navigation.goBack()}
+          onAddMore={productId ? undefined : handleAddMore}
+          loading={saving}
+        />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   )
 }

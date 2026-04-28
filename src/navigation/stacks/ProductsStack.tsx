@@ -1,7 +1,7 @@
 import React from 'react'
 import { createStackNavigator } from '@react-navigation/stack'
 import { useTheme } from '../../context/ThemeContext'
-import { ProductListScreen } from '../../screens/products/ProductListScreen'
+import { ProductListScreen } from '../../screens/products/ProductListScreenComplete'
 import { ProductFormScreen } from '../../screens/products/ProductFormScreen'
 import { ProductDetailScreen } from '../../screens/products/ProductDetailScreen'
 import { BrandDetailScreen } from '../../screens/products/BrandDetailScreen'

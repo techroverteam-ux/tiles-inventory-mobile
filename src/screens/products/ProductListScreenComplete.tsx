@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -9,45 +9,68 @@ import {
   Image,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
-import { Header } from '../../components/navigation/Header'
+import { MainHeader } from '../../components/navigation/MainHeader'
+import { ScreenActionBar } from '../../components/common/ScreenActionBar'
+import { PaginationControl } from '../../components/common/PaginationControl'
 import { Card } from '../../components/common/Card'
-import { TextInput } from '../../components/common/TextInput'
 import { ImagePreview } from '../../components/common/ImagePreview'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { productService, Product } from '../../services/api/ApiServices'
+
+const resolveImageUrl = (url?: string | null) => {
+  if (!url) return null
+  if (url.startsWith('http')) return url
+  return `https://tiles-inventory.vercel.app${url}`
+}
 import { spacing, typography, borderRadius } from '../../theme'
-import { withOpacity } from '../../utils/colorUtils'
+import { getCommonStyles } from '../../theme/commonStyles'
 
 interface ProductListScreenProps {
   navigation: any
 }
 
 export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation }) => {
-  const { theme, isDark, toggleTheme } = useTheme()
+  const { theme } = useTheme()
   const { showError, showSuccess, showWarning } = useToast()
+  const commonStyles = getCommonStyles(theme)
+
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const itemsPerPage = 20 // Standard limit
+
   useEffect(() => {
-    loadProducts()
+    loadProducts(1)
   }, [])
 
-  useEffect(() => {
-    filterProducts()
-  }, [products, searchQuery])
+  useFocusEffect(
+    useCallback(() => {
+      loadProducts(1)
+    }, [])
+  )
 
-  const loadProducts = async () => {
+  const loadProducts = async (page: number) => {
     try {
-      const response = await productService.getProducts()
-      setProducts(response.products)
-      showSuccess('Products Loaded', `Found ${response.products.length} products`)
+      setLoading(true)
+      const response = await productService.getProducts(page, itemsPerPage)
+      setProducts(response.products || [])
+      
+      // Calculate pagination based on total from API
+      const total = response.total || 0
+      setTotalItems(total)
+      setTotalPages(Math.max(1, Math.ceil(total / itemsPerPage)))
+      setCurrentPage(page)
     } catch (error) {
       showError('Error', 'Failed to load products')
     } finally {
@@ -57,22 +80,12 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    await loadProducts()
+    await loadProducts(1)
     setRefreshing(false)
   }
 
-  const filterProducts = () => {
-    if (!searchQuery.trim()) {
-      setFilteredProducts(products)
-      return
-    }
-
-    const filtered = products.filter(product =>
-      product?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product?.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product?.brand?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    setFilteredProducts(filtered)
+  const handlePageChange = (newPage: number) => {
+    loadProducts(newPage)
   }
 
   const handleDeleteProduct = (product: Product) => {
@@ -98,106 +111,207 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
     }
   }
 
-  const handleExport = () => {
-    showSuccess('Exporting products...', 'Export functionality will be available soon')
+  const handleExportData = () => {
+    import('../../utils/exportUtils').then(({ exportToExcel, commonColumns }) => {
+      exportToExcel({
+        data: products,
+        columns: commonColumns.product,
+        filename: 'products_export',
+        reportTitle: 'Products Catalog Report'
+      }).then(success => {
+        if (success) showSuccess('Export', 'Excel file ready to share')
+      })
+    })
   }
 
-  const renderProduct = ({ item }: { item: Product }) => (
-    <Card style={styles.productCard}>
-      <View style={styles.productHeader}>
-        {/* Product Image */}
-        <TouchableOpacity
-          style={styles.productImage}
-          onPress={() => {
-            if (item.imageUrl) {
-              setPreviewImage({ url: item.imageUrl, name: item?.name || 'Product Image' })
-            }
-          }}
-        >
+  const handleToggleFilters = () => {
+    showWarning('Filters', 'Advanced filtering functionality will be available in the next release.')
+  }
+
+  const renderProduct = ({ item }: { item: Product }) => {
+    const isOutOfStock = item.stockQuantity === 0
+    return (
+      <Card style={[
+        commonStyles.glassCard, 
+        styles.productCard,
+        viewMode === 'grid' && styles.gridCard // Apply grid width
+      ]}>
+        {/* Image Area with Badge */}
+        <View style={styles.imageContainer}>
           {item.imageUrl ? (
-            <Image source={{ uri: item.imageUrl }} style={styles.image} />
+            <TouchableOpacity onPress={() => setPreviewImage({ url: resolveImageUrl(item.imageUrl)!, name: item.name })}>
+              <Image source={{ uri: resolveImageUrl(item.imageUrl)! }} style={styles.image} />
+            </TouchableOpacity>
           ) : (
             <View style={styles.placeholderImage}>
-              <Icon name="image" size={32} color={theme.textSecondary} />
+              <Icon name="image" size={48} color={theme.textSecondary} />
             </View>
           )}
-        </TouchableOpacity>
-        
-        <View style={styles.productInfo}>
-          <Text style={[styles.productName, { color: theme.text }]}>{item?.name || 'Unknown Product'}</Text>
-          <Text style={[styles.productCode, { color: theme.textSecondary }]}>
-            Code: {item?.code || 'N/A'}
-          </Text>
-          <Text style={[styles.productDetails, { color: theme.textSecondary }]}>
-            {item?.brand?.name || 'Unknown Brand'} • {item?.category?.name || 'Unknown Category'}
-            {item?.size?.name && ` • ${item.size.name}`}
-          </Text>
+          <View style={styles.activeBadge}>
+            <Text style={styles.activeBadgeText}>Active</Text>
+          </View>
         </View>
-        
-        <View style={styles.productActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.primary }]}
-            onPress={() => navigation.navigate('ProductForm', { product: item })}
-          >
-            <Icon name="edit" size={18} color="#ffffff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.error }]}
-            onPress={() => handleDeleteProduct(item)}
-          >
-            <Icon name="delete" size={18} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      </View>
-      <View style={styles.productFooter}>
-        <Text style={[styles.productMeta, { color: theme.textSecondary }]}>
-          {item?.sqftPerBox || 0} sq ft/box • {item?.pcsPerBox || 0} pcs/box
-        </Text>
-        <Text style={[styles.productMeta, { color: theme.textSecondary }]}>
-          {item?.finishType?.name || 'Unknown Finish'}
-        </Text>
-      </View>
-    </Card>
-  )
 
-  const renderSkeleton = () => (
-    <Card style={styles.productCard}>
-      <View style={styles.productHeader}>
-        <Skeleton height={80} width={80} style={{ marginRight: spacing.base, borderRadius: borderRadius.base }} />
-        <View style={styles.productInfo}>
-          <Skeleton height={20} width="60%" style={{ marginBottom: spacing.sm }} />
-          <Skeleton height={16} width="40%" style={{ marginBottom: spacing.xs }} />
-          <Skeleton height={14} width="80%" />
+        <View style={styles.cardContent}>
+          {/* Title */}
+          <Text style={styles.productName}>{item?.name || 'Unknown Product'}</Text>
+
+          {/* Info Grid 2x2 */}
+          <View style={styles.infoGrid}>
+            <View style={styles.infoCol}>
+              <View style={styles.infoBox}>
+                <Icon name="layers" size={14} color={theme.mutedForeground} />
+                <Text style={styles.infoBoxText}>{item?.brand?.name || 'UNKNOWN'}</Text>
+              </View>
+              <View style={styles.infoBox}>
+                <Text style={styles.infoBoxText}>{item?.size?.name || 'N/A'}</Text>
+              </View>
+            </View>
+            <View style={styles.infoCol}>
+              <View style={styles.infoBox}>
+                <Icon name="filter-alt" size={14} color={theme.mutedForeground} />
+                <Text style={styles.infoBoxText}>{item?.category?.name || 'UNKNOWN'}</Text>
+              </View>
+              <View style={styles.infoBox}>
+                <Text style={styles.infoBoxText}>{item?.pcsPerBox || 0} pcs</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Total Stock Bar */}
+          <View style={styles.stockBar}>
+            <Text style={styles.stockLabel}>TOTAL STOCK</Text>
+            <View style={[styles.stockBadge, { backgroundColor: isOutOfStock ? theme.error : theme.success }]}>
+              <Text style={styles.stockBadgeText}>{item.stockQuantity || 0} units</Text>
+            </View>
+          </View>
+
+          {/* Footer info */}
+          <View style={styles.footerInfo}>
+            <View style={styles.footerRow}>
+              <Text style={styles.footerLabel}>Created:</Text>
+              <Text style={styles.footerValue}>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-')}</Text>
+            </View>
+            <View style={styles.footerRow}>
+              <Text style={styles.footerLabel}>By:</Text>
+              <Text style={styles.footerValue}>Admin User</Text>
+            </View>
+          </View>
+
+          {/* Actions */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity 
+              style={styles.editBtn}
+              onPress={() => navigation.navigate('ProductForm', { product: item })}
+            >
+              <Icon name="edit" size={16} color={theme.text} />
+              <Text style={styles.editBtnText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.deleteBtn}
+              onPress={() => handleDeleteProduct(item)}
+            >
+              <Icon name="delete-outline" size={16} color="#fff" />
+              <Text style={styles.deleteBtnText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+      </Card>
+    )
+  }
+
+  const renderProductRow = ({ item }: { item: Product }) => {
+    const isOutOfStock = item.stockQuantity === 0
+    return (
+      <TouchableOpacity 
+        style={styles.tableRow}
+        onPress={() => navigation.navigate('ProductForm', { product: item })}
+        activeOpacity={0.7}
+      >
+        <View style={styles.colPhoto}>
+          {item.imageUrl ? (
+            <Image source={{ uri: resolveImageUrl(item.imageUrl)! }} style={styles.rowImage} />
+          ) : (
+            <View style={styles.rowPlaceholder}>
+              <Icon name="image" size={16} color={theme.textSecondary} />
+            </View>
+          )}
+        </View>
+        <View style={styles.colProduct}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{item.name}</Text>
+        </View>
+        <View style={styles.colStock}>
+          <View style={[styles.rowBadge, { backgroundColor: isOutOfStock ? theme.error : theme.primary }]}>
+            <Text style={styles.rowBadgeText}>{item.stockQuantity} units</Text>
+          </View>
+        </View>
+        <View style={styles.colSize}>
+          <Text style={styles.rowText}>{item?.size?.name || 'N/A'}</Text>
+        </View>
+      </TouchableOpacity>
+    )
+  }
+
+  const renderItem = ({ item }: { item: Product }) => {
+    if (viewMode === 'list') return renderProductRow({ item })
+    return renderProduct({ item })
+  }
+
+  const renderListHeader = () => {
+    if (viewMode !== 'list' || products.length === 0) return null
+    return (
+      <View style={styles.tableHeader}>
+        <Text style={[styles.tableHeaderText, styles.colPhoto]}>PHOTO</Text>
+        <Text style={[styles.tableHeaderText, styles.colProduct]}>PRODUCT</Text>
+        <Text style={[styles.tableHeaderText, styles.colStock]}>STOCK</Text>
+        <Text style={[styles.tableHeaderText, styles.colSize]}>SIZE (IN)</Text>
       </View>
-    </Card>
-  )
+    )
+  }
+
+  const renderSkeleton = () => {
+    if (viewMode === 'list') {
+      return (
+        <View style={styles.tableRow}>
+          <View style={styles.colPhoto}><Skeleton height={40} width={60} borderRadius={6} /></View>
+          <View style={styles.colProduct}><Skeleton height={16} width="80%" /></View>
+          <View style={styles.colStock}><Skeleton height={24} width={60} borderRadius={12} /></View>
+          <View style={styles.colSize}><Skeleton height={16} width={40} /></View>
+        </View>
+      )
+    }
+    return (
+      <Card style={[commonStyles.glassCard, styles.productCard]}>
+        <View style={{ height: 200, width: '100%', backgroundColor: theme.surface }}>
+          <Skeleton height="100%" width="100%" />
+        </View>
+        <View style={styles.cardContent}>
+          <Skeleton height={24} width="50%" style={{ marginBottom: 16 }} />
+          <Skeleton height={80} width="100%" />
+        </View>
+      </Card>
+    )
+  }
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.background,
     },
-    content: {
-      flex: 1,
+    listContainer: {
       padding: spacing.base,
-    },
-    searchContainer: {
-      marginBottom: spacing.base,
+      paddingBottom: 80,
     },
     productCard: {
-      marginBottom: spacing.base,
-    },
-    productHeader: {
-      flexDirection: 'row',
-      marginBottom: spacing.sm,
-    },
-    productImage: {
-      width: 80,
-      height: 80,
-      borderRadius: borderRadius.base,
-      marginRight: spacing.base,
+      marginBottom: spacing.md,
+      padding: 0,
+      borderRadius: 24,
       overflow: 'hidden',
+    },
+    imageContainer: {
+      width: '100%',
+      height: 220,
+      position: 'relative',
     },
     image: {
       width: '100%',
@@ -210,145 +324,253 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
       backgroundColor: theme.surface,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: theme.border,
     },
-    productInfo: {
-      flex: 1,
+    activeBadge: {
+      position: 'absolute',
+      top: 16,
+      right: 16,
+      backgroundColor: theme.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      borderRadius: 20,
+    },
+    activeBadgeText: {
+      color: theme.primaryForeground,
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    cardContent: {
+      padding: 20,
     },
     productName: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      marginBottom: spacing.xs,
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 20,
     },
-    productCode: {
-      fontSize: typography.fontSize.sm,
-      marginBottom: spacing.xs,
-    },
-    productDetails: {
-      fontSize: typography.fontSize.sm,
-    },
-    productActions: {
+    infoGrid: {
       flexDirection: 'row',
-      gap: spacing.sm,
-      alignItems: 'flex-start',
-      flexShrink: 0,
+      marginBottom: 20,
+      gap: 12,
     },
-    actionButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+    infoCol: {
+      flex: 1,
+      gap: 12,
+    },
+    infoBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.02)',
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      borderRadius: 12,
+      gap: 8,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+    },
+    infoBoxText: {
+      color: theme.text,
+      fontSize: 12,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+    },
+    stockBar: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.03)',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderRadius: 12,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+    },
+    stockLabel: {
+      color: theme.mutedForeground,
+      fontWeight: '700',
+      fontSize: 12,
+      letterSpacing: 1,
+    },
+    stockBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+    },
+    stockBadgeText: {
+      color: '#fff',
+      fontWeight: 'bold',
+      fontSize: 12,
+    },
+    footerInfo: {
+      marginBottom: 24,
+      gap: 8,
+    },
+    footerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    footerLabel: {
+      color: theme.mutedForeground,
+      fontSize: 12,
+    },
+    footerValue: {
+      color: theme.text,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    actionRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    editBtn: {
+      flex: 1,
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+      backgroundColor: 'transparent',
+      paddingVertical: 14,
+      borderRadius: 12,
+      gap: 6,
     },
-    productFooter: {
-      borderTopWidth: 1,
-      borderTopColor: theme.border,
-      paddingTop: spacing.sm,
-      gap: spacing.xs,
+    editBtnText: {
+      color: theme.text,
+      fontWeight: 'bold',
+      fontSize: 14,
     },
-    productMeta: {
-      fontSize: typography.fontSize.xs,
+    deleteBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.error,
+      paddingVertical: 14,
+      borderRadius: 12,
+      gap: 6,
+    },
+    deleteBtnText: {
+      color: '#fff',
+      fontWeight: 'bold',
+      fontSize: 14,
     },
     fab: {
       position: 'absolute',
       right: spacing.base,
       bottom: spacing.base,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 64,
+      height: 64,
+      borderRadius: 32,
       backgroundColor: theme.primary,
       alignItems: 'center',
       justifyContent: 'center',
       elevation: 8,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
     },
-    emptyContainer: {
-      flex: 1,
+    tableHeader: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.surface,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+      marginTop: 8,
+    },
+    tableHeaderText: {
+      color: theme.mutedForeground,
+      fontSize: 10,
+      fontWeight: 'bold',
+      letterSpacing: 1,
+    },
+    tableRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.card,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    colPhoto: { flex: 0.8 },
+    colProduct: { flex: 2, paddingRight: 8 },
+    colStock: { flex: 1, alignItems: 'center' },
+    colSize: { flex: 1, alignItems: 'flex-end' },
+    rowImage: {
+      width: 60,
+      height: 40,
+      borderRadius: 6,
+      resizeMode: 'cover',
+    },
+    rowPlaceholder: {
+      width: 60,
+      height: 40,
+      borderRadius: 6,
+      backgroundColor: theme.surface,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: spacing['4xl'],
     },
-    emptyText: {
-      fontSize: typography.fontSize.base,
-      color: theme.textSecondary,
-      textAlign: 'center',
-      marginTop: spacing.base,
+    rowTitle: {
+      color: theme.text,
+      fontSize: 14,
+      fontWeight: 'bold',
     },
-    headerActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
+    rowText: {
+      color: theme.text,
+      fontSize: 12,
+      fontWeight: '600',
     },
-    themeToggle: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
+    rowBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    rowBadgeText: {
+      color: '#fff',
+      fontSize: 10,
+      fontWeight: 'bold',
     },
   })
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['right', 'left']}>
+      <MainHeader />
+      <ScreenActionBar
         title="Products"
-        showBack
-        navigation={navigation}
-        rightComponent={
-          <View style={styles.headerActions}>
-            <TouchableOpacity onPress={toggleTheme} style={{ padding: 4 }}>
-              <Icon name={isDark ? 'wb-sunny' : 'nightlight-round'} size={22} color={theme.text} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleExport}>
-              <Icon name="download" size={24} color={theme.text} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('ProductForm')}>
-              <Icon name="add" size={24} color={theme.text} />
-            </TouchableOpacity>
-          </View>
-        }
+        primaryActionLabel="Add Product"
+        onPrimaryAction={() => navigation.navigate('ProductForm')}
+        itemCount={totalItems}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onExport={handleExportData}
+        onToggleFilters={handleToggleFilters}
       />
       
-      <View style={styles.content}>
-        <View style={styles.searchContainer}>
-          <TextInput
-            placeholder="Search products..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            leftIcon="search"
-          />
-        </View>
-
-        <FlatList
-          data={loading ? Array(5).fill({}) : filteredProducts}
-          renderItem={loading ? renderSkeleton : renderProduct}
-          keyExtractor={(item, index) => loading ? index.toString() : item.id}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            !loading ? (
-              <View style={styles.emptyContainer}>
-                <Icon name="inventory" size={64} color={theme.textSecondary} />
-                <Text style={styles.emptyText}>
-                  {searchQuery ? 'No products found' : 'No products available'}
-                </Text>
-              </View>
-            ) : null
-          }
-        />
-      </View>
-
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('ProductForm')}
-      >
-        <Icon name="add" size={24} color={theme.textInverse} />
-      </TouchableOpacity>
+      <FlatList
+        data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : products}
+        renderItem={loading ? renderSkeleton : renderItem}
+        keyExtractor={(item, index) => loading ? `skel-${index}` : item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={renderListHeader}
+        ListFooterComponent={
+          !loading && products.length > 0 ? (
+            <PaginationControl
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={handlePageChange}
+            />
+          ) : null
+        }
+      />
 
       <ImagePreview
         visible={!!previewImage}

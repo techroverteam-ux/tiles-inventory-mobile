@@ -12,10 +12,10 @@ import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
 import { useSession } from '../../context/SessionContext'
 import { useToast } from '../../context/ToastContext'
-import { Header } from '../../components/navigation/Header'
+import { MainHeader } from '../../components/navigation/MainHeader'
+import { getCommonStyles } from '../../theme/commonStyles'
 import { Card } from '../../components/common/Card'
 import { TextInput } from '../../components/common/TextInput'
-import { LoadingButton } from '../../components/common/LoadingButton'
 import { spacing, typography, borderRadius } from '../../theme'
 import { withOpacity } from '../../utils/colorUtils'
 
@@ -28,11 +28,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   const { user, logout } = useSession()
   const { showSuccess, showError } = useToast()
   const [loading, setLoading] = useState(false)
+  
   const [profileData, setProfileData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: (user as any)?.phone || '',
+    name: user?.name || 'Admin User',
+    email: user?.email || 'admin@tiles.com',
   })
+
+  const [companyData, setCompanyData] = useState({
+    name: 'Tiles Showroom',
+    address: '123 Tile Street',
+  })
+
+  const commonStyles = getCommonStyles(theme)
 
   const handleLogout = () => {
     Alert.alert(
@@ -55,11 +62,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   const handleSaveProfile = async () => {
     setLoading(true)
     try {
-      // API call to update profile
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 1000)) // Mock API call
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 500))
       showSuccess('Profile updated successfully')
     } catch (error) {
       showError('Failed to update profile')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSaveCompany = async () => {
+    setLoading(true)
+    try {
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 500))
+      showSuccess('Company info updated')
+    } catch (error) {
+      showError('Failed to update company')
     } finally {
       setLoading(false)
     }
@@ -70,7 +88,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
     children: React.ReactNode
   }> = ({ title, children }) => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
+      <Text style={styles.sectionTitle}>{title}</Text>
       <Card style={styles.sectionCard} padding="none">
         {children}
       </Card>
@@ -82,10 +100,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
     title: string
     subtitle?: string
     onPress?: () => void
-    rightComponent?: React.ReactNode
     showArrow?: boolean
     color?: string
-  }> = ({ icon, title, subtitle, onPress, rightComponent, showArrow = true, color }) => (
+  }> = ({ icon, title, subtitle, onPress, showArrow = true, color }) => (
     <TouchableOpacity
       style={styles.settingsItem}
       onPress={onPress}
@@ -96,20 +113,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
           <Icon name={icon} size={20} color={color || theme.primary} />
         </View>
         <View style={styles.settingsText}>
-          <Text style={[styles.settingsTitle, { color: theme.text }]}>{title}</Text>
+          <Text style={styles.settingsTitle}>{title}</Text>
           {subtitle && (
-            <Text style={[styles.settingsSubtitle, { color: theme.textSecondary }]}>
+            <Text style={styles.settingsSubtitle}>
               {subtitle}
             </Text>
           )}
         </View>
       </View>
-      <View style={styles.settingsItemRight}>
-        {rightComponent}
-        {showArrow && onPress && (
+      {showArrow && onPress && (
+        <View style={styles.settingsItemRight}>
           <Icon name="chevron-right" size={20} color={theme.textSecondary} />
-        )}
-      </View>
+        </View>
+      )}
     </TouchableOpacity>
   )
 
@@ -119,155 +135,247 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
       backgroundColor: theme.background,
     },
     scrollContainer: {
-      padding: spacing.base,
+      paddingHorizontal: 16,
+      paddingBottom: 100,
     },
-    profileCard: {
+    headerArea: {
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+    },
+    screenTitle: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 4,
+      letterSpacing: -0.5,
+    },
+    screenSubtitle: {
+      fontSize: 14,
+      color: theme.mutedForeground,
+      flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: spacing.lg,
     },
-    avatar: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: theme.primary,
+    settingsCard: {
+      marginBottom: 20,
+      padding: 24,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+    },
+    cardHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 24,
+      gap: 12,
+    },
+    cardIconBox: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: spacing.base,
+      borderWidth: 1,
+      borderColor: 'rgba(59, 130, 246, 0.2)',
     },
-    avatarText: {
-      fontSize: typography.fontSize.xl,
-      fontWeight: typography.fontWeight.bold,
-      color: theme.textInverse,
-    },
-    userName: {
-      fontSize: typography.fontSize.lg,
-      fontWeight: typography.fontWeight.bold,
+    cardTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
       color: theme.text,
-      marginBottom: spacing.xs,
     },
-    userEmail: {
-      fontSize: typography.fontSize.base,
-      color: theme.textSecondary,
+    inputGroup: {
+      marginBottom: 20,
+    },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 8,
+    },
+    inputField: {
+      backgroundColor: 'rgba(255,255,255,0.03)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      color: theme.text,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    saveBtn: {
+      backgroundColor: theme.primary,
+      paddingVertical: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    saveBtnText: {
+      color: theme.primaryForeground,
+      fontWeight: 'bold',
+      fontSize: 14,
     },
     section: {
-      marginBottom: spacing.lg,
+      marginBottom: 24,
     },
     sectionTitle: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      marginBottom: spacing.sm,
-      paddingHorizontal: spacing.xs,
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 12,
+      marginLeft: 8,
     },
     sectionCard: {
+      borderRadius: 20,
       overflow: 'hidden',
     },
     settingsItem: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: spacing.base,
-      paddingVertical: spacing.base,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
       borderBottomWidth: 1,
-      borderBottomColor: theme.border,
+      borderBottomColor: 'rgba(255,255,255,0.05)',
     },
     settingsItemLeft: {
       flexDirection: 'row',
       alignItems: 'center',
+      gap: 16,
       flex: 1,
     },
     settingsIcon: {
       width: 40,
       height: 40,
-      borderRadius: 20,
+      borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: spacing.base,
     },
     settingsText: {
       flex: 1,
     },
     settingsTitle: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.medium,
+      fontSize: 15,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 2,
     },
     settingsSubtitle: {
-      fontSize: typography.fontSize.sm,
-      marginTop: spacing.xs,
+      fontSize: 12,
+      color: theme.mutedForeground,
     },
     settingsItemRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-    },
-    profileForm: {
-      gap: spacing.base,
-      marginBottom: spacing.base,
+      marginLeft: 12,
     },
     dangerZone: {
-      borderColor: withOpacity(theme.error, 0.3),
+      borderColor: theme.error,
       borderWidth: 1,
-      backgroundColor: withOpacity(theme.error, 0.05),
+    },
+    fab: {
+      position: 'absolute',
+      right: spacing.base,
+      bottom: spacing.base,
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: theme.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
     },
   })
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
-        title="Settings"
-        showBack
-        navigation={navigation}
-      />
+    <SafeAreaView style={styles.container} edges={['right', 'left']}>
+      <MainHeader />
+      <View style={styles.headerArea}>
+        <Text style={styles.screenTitle}>Settings</Text>
+        <Text style={styles.screenSubtitle}>
+          <Icon name="notifications-none" size={14} color={theme.mutedForeground} style={{ marginRight: 6 }} /> Manage your account and application preferences
+        </Text>
+      </View>
+      
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Card */}
-        <Card style={styles.profileCard} padding="lg">
-          <TouchableOpacity style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {user?.name?.charAt(0).toUpperCase() || 'A'}
-            </Text>
-          </TouchableOpacity>
-          <Text style={styles.userName}>{user?.name || 'Admin User'}</Text>
-          <Text style={styles.userEmail}>{user?.email || 'admin@example.com'}</Text>
-        </Card>
-
-        {/* Profile Settings */}
-        <SettingsSection title="Profile Information">
-          <View style={[styles.settingsItem, { flexDirection: 'column', alignItems: 'stretch' }]}>
-            <View style={styles.profileForm}>
-              <TextInput
-                label="Full Name"
-                value={profileData.name}
-                onChangeText={(text) => setProfileData({ ...profileData, name: text })}
-                placeholder="Enter your full name"
-              />
-              <TextInput
-                label="Email Address"
-                value={profileData.email}
-                onChangeText={(text) => setProfileData({ ...profileData, email: text })}
-                placeholder="Enter your email"
-                keyboardType="email-address"
-              />
-              <TextInput
-                label="Phone Number"
-                value={profileData.phone}
-                onChangeText={(text) => setProfileData({ ...profileData, phone: text })}
-                placeholder="Enter your phone number"
-                keyboardType="phone-pad"
-              />
+        {/* Profile Settings Card */}
+        <Card style={[commonStyles.glassCard, styles.settingsCard]}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardIconBox}>
+              <Icon name="person-outline" size={20} color="#60a5fa" />
             </View>
-            <LoadingButton
-              title="Save Changes"
-              onPress={handleSaveProfile}
-              loading={loading}
-              variant="primary"
+            <Text style={styles.cardTitle}>Profile Settings</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Full Name</Text>
+            <TextInput
+              style={styles.inputField}
+              value={profileData.name}
+              onChangeText={(text) => setProfileData({ ...profileData, name: text })}
+              placeholder="Admin User"
+              placeholderTextColor={theme.mutedForeground}
             />
           </View>
-        </SettingsSection>
 
-        {/* App Settings */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email Address</Text>
+            <TextInput
+              style={styles.inputField}
+              value={profileData.email}
+              onChangeText={(text) => setProfileData({ ...profileData, email: text })}
+              placeholder="admin@tiles.com"
+              keyboardType="email-address"
+              placeholderTextColor={theme.mutedForeground}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile}>
+            <Text style={styles.saveBtnText}>Save Profile Changes</Text>
+          </TouchableOpacity>
+        </Card>
+
+        {/* Company Settings Card */}
+        <Card style={[commonStyles.glassCard, styles.settingsCard]}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardIconBox}>
+              <Icon name="business" size={20} color="#60a5fa" />
+            </View>
+            <Text style={styles.cardTitle}>Company Settings</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Company Name</Text>
+            <TextInput
+              style={styles.inputField}
+              value={companyData.name}
+              onChangeText={(text) => setCompanyData({ ...companyData, name: text })}
+              placeholderTextColor={theme.mutedForeground}
+            />
+          </View>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Business Address</Text>
+            <TextInput
+              style={styles.inputField}
+              value={companyData.address}
+              onChangeText={(text) => setCompanyData({ ...companyData, address: text })}
+              placeholderTextColor={theme.mutedForeground}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveCompany}>
+            <Text style={styles.saveBtnText}>Update Company Info</Text>
+          </TouchableOpacity>
+        </Card>
+
+        {/* Additional Settings */}
         <SettingsSection title="App Settings">
           <SettingsItem
             icon={isDark ? 'wb-sunny' : 'nightlight-round'}
@@ -280,98 +388,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
             icon="notifications"
             title="Notifications"
             subtitle="Manage notification preferences"
-            onPress={() => navigation.navigate('Notifications')}
-          />
-          <SettingsItem
-            icon="language"
-            title="Language"
-            subtitle="English (Default)"
-            onPress={() => showSuccess('Language settings coming soon')}
+            onPress={() => {}}
           />
         </SettingsSection>
 
-        {/* Management */}
-        <SettingsSection title="Data Management">
-          <SettingsItem
-            icon="people"
-            title="Brand Management"
-            subtitle="Manage brands and suppliers"
-            onPress={() => navigation.navigate('BrandManagement')}
-            color={theme.info}
-          />
-          <SettingsItem
-            icon="palette"
-            title="Category Management"
-            subtitle="Organize product categories"
-            onPress={() => navigation.navigate('CategoryManagement')}
-            color={theme.warning}
-          />
-          <SettingsItem
-            icon="straighten"
-            title="Size Management"
-            subtitle="Configure product sizes"
-            onPress={() => navigation.navigate('SizeManagement')}
-            color={theme.success}
-          />
-          <SettingsItem
-            icon="location-on"
-            title="Location Management"
-            subtitle="Manage warehouse locations"
-            onPress={() => navigation.navigate('LocationManagement')}
-            color={theme.primary}
-          />
-        </SettingsSection>
-
-        {/* Reports & Analytics */}
-        <SettingsSection title="Reports & Analytics">
-          <SettingsItem
-            icon="description"
-            title="Reports"
-            subtitle="View detailed reports"
-            onPress={() => navigation.navigate('Reports')}
-            color={theme.info}
-          />
-          <SettingsItem
-            icon="search"
-            title="Global Search"
-            subtitle="Search across all data"
-            onPress={() => navigation.navigate('GlobalSearch')}
-            color={theme.warning}
-          />
-        </SettingsSection>
-
-        {/* Admin Functions */}
-        <SettingsSection title="Admin Functions">
-          <SettingsItem
-            icon="admin-panel-settings"
-            title="Admin Panel"
-            subtitle="Complete administrative control"
-            onPress={() => navigation.navigate('AdminPanel')}
-            color={theme.primary}
-          />
-          <SettingsItem
-            icon="build"
-            title="Admin Functions"
-            subtitle="Database cleanup and maintenance"
-            onPress={() => navigation.navigate('AdminFunctions')}
-            color={theme.error}
-          />
-          <SettingsItem
-            icon="backup"
-            title="Data Backup"
-            subtitle="Export and backup data"
-            onPress={() => navigation.navigate('AdminPanel')}
-            color={theme.success}
-          />
-        </SettingsSection>
-
-        {/* Support */}
         <SettingsSection title="Support">
           <SettingsItem
             icon="help"
             title="Help & Support"
             subtitle="Get help and contact support"
-            onPress={() => showSuccess('Support feature coming soon')}
+            onPress={() => {}}
           />
           <SettingsItem
             icon="info"
@@ -381,9 +407,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
           />
         </SettingsSection>
 
-        {/* Danger Zone */}
         <Card style={[styles.section, styles.dangerZone]} padding="lg">
-          <Text style={[styles.sectionTitle, { color: theme.error }]}>⚠️ Danger Zone</Text>
+          <Text style={[styles.sectionTitle, { color: theme.error, marginLeft: 0 }]}>⚠️ Danger Zone</Text>
           <SettingsItem
             icon="logout"
             title="Logout"
@@ -394,6 +419,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
           />
         </Card>
       </ScrollView>
+
+      {/* Floating Action Button */}
+      <TouchableOpacity style={styles.fab}>
+        <Icon name="add" size={24} color="#0f172a" />
+      </TouchableOpacity>
     </SafeAreaView>
   )
 }

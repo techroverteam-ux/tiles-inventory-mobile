@@ -6,264 +6,251 @@ import {
   StyleSheet,
   RefreshControl,
   TouchableOpacity,
-  Alert
+  Image,
 } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
+import { useToast } from '../../context/ToastContext'
+import { MainHeader } from '../../components/navigation/MainHeader'
+import { ScreenActionBar } from '../../components/common/ScreenActionBar'
+import { PaginationControl } from '../../components/common/PaginationControl'
 import { Card } from '../../components/common/Card'
-import { TextInput } from '../../components/common/TextInput'
-import { LoadingButton } from '../../components/common/LoadingButton'
-import { Skeleton, SkeletonText } from '../../components/loading/Skeleton'
+import { Skeleton } from '../../components/loading/Skeleton'
 import { spacing, typography, borderRadius } from '../../theme'
+import { getCommonStyles } from '../../theme/commonStyles'
 import { InventoryNavigationProp } from '../../navigation/types'
-import { inventoryService, Batch, InventoryFilters } from '../../services/api/ApiServices'
+import { inventoryService, Batch } from '../../services/api/ApiServices'
+
+const resolveImageUrl = (url?: string | null) => {
+  if (!url) return null
+  if (url.startsWith('http')) return url
+  return `https://tiles-inventory.vercel.app${url}`
+}
 
 export const InventoryListScreen: React.FC = () => {
   const { theme } = useTheme()
   const navigation = useNavigation<InventoryNavigationProp>()
-  
+  const { showWarning, showSuccess, showError } = useToast()
+  const commonStyles = getCommonStyles(theme)
+
   const [inventory, setInventory] = useState<Batch[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const [totalItems, setTotalItems] = useState(0)
+  const itemsPerPage = 20
 
-  const fetchInventory = useCallback(async (page = 1, isRefresh = false, search = '') => {
-    if (page === 1) {
-      isRefresh ? setRefreshing(true) : setLoading(true)
-    } else {
-      setLoadingMore(true)
-    }
-
+  const fetchInventory = useCallback(async (page: number) => {
     try {
-      const filters: InventoryFilters = {
-        page,
-        limit: 20,
-        search: search.trim() || undefined,
-        sortBy: 'updatedAt',
-        sortOrder: 'desc'
-      }
-
-      const response = await inventoryService.getInventory(filters)
+      setLoading(true)
+      const response = await inventoryService.getInventory({ page, limit: itemsPerPage })
+      setInventory(response.inventory || [])
       
-      if (page === 1) {
-        setInventory(response.inventory)
-      } else {
-        setInventory(prev => [...prev, ...response.inventory])
-      }
-
-      setCurrentPage(response.pagination.page)
-      setTotalPages(response.pagination.pages)
-      setHasMore(response.pagination.page < response.pagination.pages)
-      
+      const total = response.pagination?.total || 0
+      setTotalItems(total)
+      setTotalPages(Math.max(1, Math.ceil(total / itemsPerPage)))
+      setCurrentPage(page)
     } catch (error: any) {
       console.error('Error fetching inventory:', error)
-      Alert.alert('Error', 'Failed to fetch inventory data')
+      showError('Error', 'Failed to fetch inventory data')
     } finally {
       setLoading(false)
       setRefreshing(false)
-      setLoadingMore(false)
     }
   }, [])
 
   useFocusEffect(
     useCallback(() => {
-      fetchInventory(1, false, searchQuery)
-    }, [fetchInventory, searchQuery])
+      fetchInventory(1)
+    }, [fetchInventory])
   )
 
   const onRefresh = useCallback(() => {
-    setCurrentPage(1)
-    fetchInventory(1, true, searchQuery)
-  }, [fetchInventory, searchQuery])
-
-  const loadMore = useCallback(() => {
-    if (!loadingMore && hasMore && currentPage < totalPages) {
-      fetchInventory(currentPage + 1, false, searchQuery)
-    }
-  }, [loadingMore, hasMore, currentPage, totalPages, fetchInventory, searchQuery])
-
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query)
-    setCurrentPage(1)
-    fetchInventory(1, false, query)
+    setRefreshing(true)
+    fetchInventory(1)
   }, [fetchInventory])
 
-  const getStockStatus = (batch: Batch) => {
-    if (batch.quantity === 0) {
-      return { label: 'Out of Stock', color: theme.danger }
-    }
-    if (batch.quantity < 10) {
-      return { label: 'Low Stock', color: theme.warning }
-    }
-    return { label: 'In Stock', color: theme.success }
+  const handlePageChange = (newPage: number) => {
+    fetchInventory(newPage)
   }
 
-  const handleItemPress = (batch: Batch) => {
-    navigation.navigate('InventoryDetail', { productId: batch.productId })
+  const handleExportData = () => {
+    import('../../utils/exportUtils').then(({ exportToExcel, commonColumns }) => {
+      exportToExcel({
+        data: inventory,
+        columns: commonColumns.inventory,
+        filename: 'inventory_export',
+        reportTitle: 'Inventory Stock Report'
+      }).then(success => {
+        if (success) showSuccess('Export', 'Excel file ready to share')
+      })
+    })
+  }
+
+  const handleToggleFilters = () => {
+    showWarning('Filters', 'Advanced filtering functionality will be available in the next release.')
   }
 
   const handleStockUpdate = (batch: Batch) => {
     navigation.navigate('StockUpdate', { productId: batch.productId })
   }
 
+  const handleDelete = (batch: Batch) => {
+    showWarning(
+      'Delete Inventory',
+      `Are you sure you want to delete this inventory record?`,
+      {
+        action: {
+          label: 'Delete',
+          onPress: () => {
+            setInventory(inventory.filter(b => b.id !== batch.id))
+            showSuccess('Deleted', 'Inventory record deleted')
+          }
+        }
+      }
+    )
+  }
+
   const renderInventoryCard = ({ item: batch }: { item: Batch }) => {
-    const stockStatus = getStockStatus(batch)
-    const totalValue = batch.quantity * (batch.sellingPrice || batch.purchasePrice || 0)
-
     return (
-      <Card
-        style={styles.inventoryCard}
-        touchable
-        onPress={() => handleItemPress(batch)}
-        padding="base"
-      >
-        <View style={styles.cardHeader}>
-          <View style={styles.productInfo}>
-            {batch.product.imageUrl ? (
-              <View style={styles.productImageContainer}>
-                <Icon name="image" size={24} color={theme.textSecondary} />
-              </View>
-            ) : (
-              <View style={styles.productImagePlaceholder}>
-                <Icon name="inventory" size={24} color={theme.textSecondary} />
-              </View>
-            )}
-            
-            <View style={styles.productDetails}>
-              <Text style={styles.productName} numberOfLines={1}>
-                {batch.product.name}
-              </Text>
-              <Text style={styles.productCode} numberOfLines={1}>
-                {batch.product.code}
-              </Text>
-              <Text style={styles.brandCategory} numberOfLines={1}>
-                {batch.product.brand.name} • {batch.product.category.name}
-              </Text>
-              <Text style={styles.batchInfo} numberOfLines={1}>
-                Batch: {batch.batchNumber} • {batch.location.name}
-              </Text>
+      <Card style={[
+        commonStyles.glassCard, 
+        styles.inventoryCard,
+        viewMode === 'grid' && styles.gridCard
+      ]}>
+        <View style={styles.imageContainer}>
+          {batch.product.imageUrl ? (
+            <Image source={{ uri: resolveImageUrl(batch.product.imageUrl)! }} style={styles.image} />
+          ) : (
+            <View style={styles.placeholderImage}>
+              <Icon name="image" size={48} color={theme.textSecondary} />
             </View>
-          </View>
-
-          <View style={[styles.statusBadge, { backgroundColor: stockStatus.color }]}>
-            <Text style={styles.statusText}>{stockStatus.label}</Text>
+          )}
+          <View style={styles.unitsBadge}>
+            <Text style={styles.unitsBadgeText}>{batch.quantity} units</Text>
           </View>
         </View>
 
         <View style={styles.cardContent}>
-          <View style={styles.stockInfo}>
-            <View style={styles.stockItem}>
-              <Text style={styles.stockLabel}>Quantity</Text>
-              <Text style={styles.stockValue}>{batch.quantity}</Text>
+          <View style={styles.headerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.productName} numberOfLines={1}>{batch.product.name}</Text>
+              <Text style={styles.brandName} numberOfLines={1}>{batch.product.brand.name}</Text>
             </View>
-            <View style={styles.stockItem}>
-              <Text style={styles.stockLabel}>Purchase</Text>
-              <Text style={styles.stockValue}>
-                ${batch.purchasePrice?.toFixed(2) || '0.00'}
-              </Text>
-            </View>
-            <View style={styles.stockItem}>
-              <Text style={styles.stockLabel}>Selling</Text>
-              <Text style={styles.stockValue}>
-                ${batch.sellingPrice?.toFixed(2) || '0.00'}
-              </Text>
-            </View>
-            <View style={styles.stockItem}>
-              <Text style={styles.stockLabel}>Total Value</Text>
-              <Text style={styles.stockValue}>
-                ${totalValue.toFixed(2)}
-              </Text>
+            <View style={styles.actionsRow}>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => handleStockUpdate(batch)}>
+                <Icon name="edit" size={16} color={theme.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.iconBtn, { borderColor: theme.error }]} onPress={() => handleDelete(batch)}>
+                <Icon name="delete-outline" size={16} color={theme.error} />
+              </TouchableOpacity>
             </View>
           </View>
 
-          {batch.shade && (
-            <View style={styles.shadeInfo}>
-              <Text style={styles.shadeLabel}>Shade: </Text>
-              <Text style={styles.shadeValue}>{batch.shade}</Text>
+          <View style={styles.grid2x2}>
+            <View style={styles.gridItem}>
+              <Text style={styles.gridLabel}>Size: </Text>
+              <Text style={styles.gridValue}>{batch.product.size?.name || 'N/A'}</Text>
             </View>
-          )}
-
-          {batch.expiryDate && (
-            <View style={styles.expiryInfo}>
-              <Text style={styles.expiryLabel}>Expires: </Text>
-              <Text style={styles.expiryValue}>
-                {new Date(batch.expiryDate).toLocaleDateString()}
-              </Text>
+            <View style={styles.gridItem}>
+              <Text style={styles.gridLabel}>Cat: </Text>
+              <Text style={styles.gridValue}>{batch.product.category?.name || 'N/A'}</Text>
             </View>
-          )}
+            <View style={styles.gridItem}>
+              <Text style={styles.gridLabel}>Batch: </Text>
+              <Text style={styles.gridValue}>{batch.batchNumber || 'N/A'}</Text>
+            </View>
+            <View style={styles.gridItem}>
+              <Text style={styles.gridLabel}>Loc: </Text>
+              <Text style={styles.gridValue}>{batch.location?.name || 'N/A'}</Text>
+            </View>
+          </View>
 
-          <View style={styles.cardFooter}>
-            <Text style={styles.lastUpdated}>
-              Updated: {new Date(batch.updatedAt).toLocaleDateString()}
-            </Text>
-            <TouchableOpacity
-              style={styles.updateButton}
-              onPress={() => handleStockUpdate(batch)}
-            >
-              <Icon name="edit" size={16} color={theme.primary} />
-              <Text style={styles.updateButtonText}>Update</Text>
-            </TouchableOpacity>
+          <View style={styles.footerRow}>
+            <Text style={styles.sellingLabel}>Selling: </Text>
+            <Text style={styles.sellingValue}>₹{batch.sellingPrice || 0}</Text>
           </View>
         </View>
       </Card>
     )
   }
 
-  const renderSkeletonCard = () => (
-    <Card style={styles.inventoryCard} padding="base">
-      <View style={styles.cardHeader}>
-        <View style={styles.productInfo}>
-          <Skeleton width={48} height={48} borderRadius={8} />
-          <View style={styles.productDetails}>
-            <Skeleton width="80%" height={16} />
-            <Skeleton width="60%" height={12} style={{ marginTop: 4 }} />
-            <Skeleton width="70%" height={12} style={{ marginTop: 4 }} />
-            <Skeleton width="90%" height={12} style={{ marginTop: 4 }} />
+  const renderInventoryRow = ({ item: batch }: { item: Batch }) => {
+    return (
+      <TouchableOpacity 
+        style={styles.tableRow}
+        onPress={() => handleStockUpdate(batch)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.colPhoto}>
+          {batch.product.imageUrl ? (
+            <Image source={{ uri: resolveImageUrl(batch.product.imageUrl)! }} style={styles.rowImage} />
+          ) : (
+            <View style={styles.rowPlaceholder}>
+              <Icon name="image" size={16} color={theme.textSecondary} />
+            </View>
+          )}
+        </View>
+        <View style={styles.colProduct}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{batch.product.name}</Text>
+          <Text style={styles.rowSubtitle} numberOfLines={1}>Batch: {batch.batchNumber || 'N/A'}</Text>
+        </View>
+        <View style={styles.colStock}>
+          <View style={[styles.rowBadge, { backgroundColor: theme.primary }]}>
+            <Text style={styles.rowBadgeText}>{batch.quantity} units</Text>
           </View>
         </View>
-        <Skeleton width={60} height={24} borderRadius={12} />
-      </View>
-      
-      <View style={styles.cardContent}>
-        <View style={styles.stockInfo}>
-          {[1, 2, 3, 4].map((i) => (
-            <View key={i} style={styles.stockItem}>
-              <Skeleton width={40} height={12} />
-              <Skeleton width={30} height={16} style={{ marginTop: 4 }} />
-            </View>
-          ))}
+        <View style={styles.colPrice}>
+          <Text style={styles.rowText}>₹{batch.sellingPrice || 0}</Text>
         </View>
-        
-        <View style={styles.cardFooter}>
-          <Skeleton width={100} height={12} />
-          <Skeleton width={60} height={28} borderRadius={14} />
-        </View>
-      </View>
-    </Card>
-  )
+      </TouchableOpacity>
+    )
+  }
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Icon name="inventory" size={64} color={theme.textSecondary} />
-      <Text style={styles.emptyTitle}>No inventory found</Text>
-      <Text style={styles.emptySubtitle}>
-        {searchQuery ? 'Try adjusting your search terms' : 'No inventory items available'}
-      </Text>
-    </View>
-  )
+  const renderItem = ({ item }: { item: Batch }) => {
+    if (viewMode === 'list') return renderInventoryRow({ item })
+    return renderInventoryCard({ item })
+  }
 
-  const renderFooter = () => {
-    if (!loadingMore) return null
-    
+  const renderListHeader = () => {
+    if (viewMode !== 'list' || inventory.length === 0) return null
     return (
-      <View style={styles.loadingFooter}>
-        <Text style={styles.loadingText}>Loading more...</Text>
+      <View style={styles.tableHeader}>
+        <Text style={[styles.tableHeaderText, styles.colPhoto]}>PHOTO</Text>
+        <Text style={[styles.tableHeaderText, styles.colProduct]}>PRODUCT</Text>
+        <Text style={[styles.tableHeaderText, styles.colStock]}>STOCK</Text>
+        <Text style={[styles.tableHeaderText, styles.colPrice]}>PRICE</Text>
       </View>
+    )
+  }
+
+  const renderSkeletonCard = () => {
+    if (viewMode === 'list') {
+      return (
+        <View style={styles.tableRow}>
+          <View style={styles.colPhoto}><Skeleton height={40} width={60} borderRadius={6} /></View>
+          <View style={styles.colProduct}><Skeleton height={16} width="80%" /></View>
+          <View style={styles.colStock}><Skeleton height={24} width={60} borderRadius={12} /></View>
+          <View style={styles.colPrice}><Skeleton height={16} width={40} /></View>
+        </View>
+      )
+    }
+    return (
+      <Card style={[commonStyles.glassCard, styles.inventoryCard]}>
+        <View style={{ height: 180, width: '100%', backgroundColor: theme.surface }}>
+          <Skeleton height="100%" width="100%" />
+        </View>
+        <View style={styles.cardContent}>
+          <Skeleton height={24} width="50%" style={{ marginBottom: 16 }} />
+          <Skeleton height={60} width="100%" />
+        </View>
+      </Card>
     )
   }
 
@@ -272,217 +259,245 @@ export const InventoryListScreen: React.FC = () => {
       flex: 1,
       backgroundColor: theme.background,
     },
-    searchContainer: {
-      padding: spacing.base,
-    },
     listContainer: {
       padding: spacing.base,
       paddingBottom: 80,
     },
     inventoryCard: {
-      marginBottom: spacing.base,
-    },
-    cardHeader: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
       marginBottom: spacing.md,
+      padding: 0,
+      borderRadius: 16,
+      overflow: 'hidden',
     },
-    productInfo: {
-      flexDirection: 'row',
-      flex: 1,
-      marginRight: spacing.md,
+    imageContainer: {
+      width: '100%',
+      height: 180,
+      position: 'relative',
     },
-    productImageContainer: {
-      width: 48,
-      height: 48,
-      backgroundColor: theme.gray100,
-      borderRadius: borderRadius.base,
+    image: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    placeholderImage: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: 'rgba(255,255,255,0.02)',
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: spacing.md,
     },
-    productImagePlaceholder: {
-      width: 48,
-      height: 48,
-      backgroundColor: theme.gray100,
-      borderRadius: borderRadius.base,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: spacing.md,
+    unitsBadge: {
+      position: 'absolute',
+      top: 12,
+      right: 12,
+      backgroundColor: theme.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 16,
     },
-    productDetails: {
-      flex: 1,
-    },
-    productName: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      color: theme.text,
-      marginBottom: 2,
-    },
-    productCode: {
-      fontSize: typography.fontSize.xs,
-      color: theme.textSecondary,
-      marginBottom: 2,
-    },
-    brandCategory: {
-      fontSize: typography.fontSize.xs,
-      color: theme.textSecondary,
-      marginBottom: 2,
-    },
-    batchInfo: {
-      fontSize: typography.fontSize.xs,
-      color: theme.primary,
-      fontWeight: typography.fontWeight.medium,
-    },
-    statusBadge: {
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-      borderRadius: borderRadius.md,
-    },
-    statusText: {
-      fontSize: typography.fontSize.xs,
-      fontWeight: typography.fontWeight.semibold,
-      color: theme.textInverse,
+    unitsBadgeText: {
+      color: theme.primaryForeground,
+      fontSize: 12,
+      fontWeight: 'bold',
     },
     cardContent: {
-      gap: spacing.md,
+      padding: 16,
     },
-    stockInfo: {
+    headerRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 16,
     },
-    stockItem: {
-      alignItems: 'center',
-    },
-    stockLabel: {
-      fontSize: typography.fontSize.xs,
-      color: theme.textSecondary,
-      marginBottom: 2,
-    },
-    stockValue: {
-      fontSize: typography.fontSize.sm,
-      fontWeight: typography.fontWeight.semibold,
+    productName: {
+      fontSize: 18,
+      fontWeight: 'bold',
       color: theme.text,
+      marginBottom: 4,
     },
-    shadeInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    shadeLabel: {
-      fontSize: typography.fontSize.sm,
-      color: theme.textSecondary,
-    },
-    shadeValue: {
-      fontSize: typography.fontSize.sm,
-      color: theme.text,
-      fontWeight: typography.fontWeight.medium,
-    },
-    expiryInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    expiryLabel: {
-      fontSize: typography.fontSize.sm,
-      color: theme.textSecondary,
-    },
-    expiryValue: {
-      fontSize: typography.fontSize.sm,
-      color: theme.warning,
-      fontWeight: typography.fontWeight.medium,
-    },
-    cardFooter: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    lastUpdated: {
-      fontSize: typography.fontSize.xs,
-      color: theme.textSecondary,
-    },
-    updateButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: theme.gray100,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderRadius: borderRadius.md,
-      gap: spacing.xs,
-    },
-    updateButtonText: {
-      fontSize: typography.fontSize.xs,
+    brandName: {
+      fontSize: 12,
+      fontWeight: '600',
       color: theme.primary,
-      fontWeight: typography.fontWeight.medium,
+      textTransform: 'uppercase',
     },
-    emptyState: {
-      flex: 1,
+    actionsRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    iconBtn: {
+      width: 32,
+      height: 32,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: spacing['2xl'],
-      paddingVertical: spacing['4xl'],
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 8,
     },
-    emptyTitle: {
-      fontSize: typography.fontSize.lg,
-      fontWeight: typography.fontWeight.semibold,
-      color: theme.text,
-      marginTop: spacing.base,
-      marginBottom: spacing.sm,
+    grid2x2: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: 16,
     },
-    emptySubtitle: {
-      fontSize: typography.fontSize.sm,
-      color: theme.textSecondary,
-      textAlign: 'center',
-    },
-    loadingFooter: {
-      paddingVertical: spacing.base,
+    gridItem: {
+      width: '50%',
+      flexDirection: 'row',
       alignItems: 'center',
+      marginBottom: 8,
     },
-    loadingText: {
-      fontSize: typography.fontSize.sm,
-      color: theme.textSecondary,
+    gridLabel: {
+      fontSize: 12,
+      color: theme.mutedForeground,
+    },
+    gridValue: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.text,
+    },
+    footerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+    sellingLabel: {
+      fontSize: 14,
+      color: theme.mutedForeground,
+    },
+    sellingValue: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: theme.primary,
+    },
+    fab: {
+      position: 'absolute',
+      right: spacing.base,
+      bottom: spacing.base,
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: theme.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+    },
+    tableHeader: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.surface,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+      marginTop: 8,
+    },
+    tableHeaderText: {
+      color: theme.mutedForeground,
+      fontSize: 10,
+      fontWeight: 'bold',
+      letterSpacing: 1,
+    },
+    tableRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.card,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    colPhoto: { flex: 0.8 },
+    colProduct: { flex: 2, paddingRight: 8 },
+    colStock: { flex: 1, alignItems: 'center' },
+    colPrice: { flex: 1, alignItems: 'flex-end' },
+    rowImage: {
+      width: 60,
+      height: 40,
+      borderRadius: 6,
+      resizeMode: 'cover',
+    },
+    rowPlaceholder: {
+      width: 60,
+      height: 40,
+      borderRadius: 6,
+      backgroundColor: theme.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    rowTitle: {
+      color: theme.text,
+      fontSize: 14,
+      fontWeight: 'bold',
+    },
+    rowSubtitle: {
+      color: theme.mutedForeground,
+      fontSize: 10,
+      marginTop: 2,
+    },
+    rowText: {
+      color: theme.text,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    rowBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    rowBadgeText: {
+      color: '#fff',
+      fontSize: 10,
+      fontWeight: 'bold',
     },
   })
 
   return (
-    <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <TextInput
-          value={searchQuery}
-          onChangeText={handleSearch}
-          placeholder="Search inventory..."
-          leftIcon="search"
-        />
-      </View>
-
-      {loading && inventory.length === 0 ? (
-        <FlatList
-          data={Array.from({ length: 6 })}
-          renderItem={renderSkeletonCard}
-          keyExtractor={(_, index) => `skeleton-${index}`}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <FlatList
-          data={inventory}
-          renderItem={renderInventoryCard}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[theme.primary]}
-              tintColor={theme.primary}
+    <SafeAreaView style={styles.container} edges={['right', 'left']}>
+      <MainHeader />
+      <ScreenActionBar
+        title="Inventory"
+        primaryActionLabel="Add Stock"
+        onPrimaryAction={() => navigation.navigate('StockUpdate', { productId: '' })}
+        itemCount={totalItems}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onExport={handleExportData}
+        onToggleFilters={handleToggleFilters}
+      />
+      
+      <FlatList
+        data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : inventory}
+        renderItem={loading ? renderSkeletonCard : renderItem}
+        keyExtractor={(item, index) => loading ? `skel-${index}` : item.id}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListHeaderComponent={renderListHeader}
+        ListFooterComponent={
+          !loading && inventory.length > 0 ? (
+            <PaginationControl
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={handlePageChange}
             />
-          }
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListEmptyComponent={renderEmptyState}
-          ListFooterComponent={renderFooter}
-        />
-      )}
-    </View>
+          ) : null
+        }
+      />
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('StockUpdate', { productId: '' })}
+      >
+        <Icon name="add" size={24} color={theme.textInverse} />
+      </TouchableOpacity>
+    </SafeAreaView>
   )
 }

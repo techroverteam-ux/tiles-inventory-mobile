@@ -5,54 +5,75 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   RefreshControl,
-  Switch,
+  Image,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
-import { Header } from '../../components/navigation/Header'
+import { MainHeader } from '../../components/navigation/MainHeader'
+import { ScreenActionBar } from '../../components/common/ScreenActionBar'
+import { PaginationControl } from '../../components/common/PaginationControl'
 import { Card } from '../../components/common/Card'
-import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { purchaseOrderService, salesOrderService, PurchaseOrder, SalesOrder } from '../../services/api/ApiServices'
 import { spacing, typography, borderRadius } from '../../theme'
+import { getCommonStyles } from '../../theme/commonStyles'
 
 interface OrderListScreenProps {
   navigation: any
+  route: any
 }
 
 type OrderType = 'purchase' | 'sales'
-type OrderStatus = 'ALL' | 'PENDING' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED'
 
-export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation }) => {
-  const { theme, isDark, toggleTheme } = useTheme()
-  const { showToast } = useToast()
-  const [orderType, setOrderType] = useState<OrderType>('purchase')
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
-  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([])
+export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, route }) => {
+  const { theme } = useTheme()
+  const { showToast, showWarning } = useToast()
+  const commonStyles = getCommonStyles(theme)
+
+  // Determine order type from route params
+  const orderType: OrderType = route.params?.orderType || 'purchase'
+
+  const [orders, setOrders] = useState<Array<PurchaseOrder | SalesOrder>>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [filter, setFilter] = useState<OrderStatus>('ALL')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const itemsPerPage = 20
 
   useEffect(() => {
-    loadOrders()
-  }, [])
+    loadOrders(1)
+  }, [orderType])
 
-  const loadOrders = async () => {
+  const loadOrders = async (page: number) => {
     try {
       setLoading(true)
-      const [poResponse, soResponse] = await Promise.all([
-        purchaseOrderService.getPurchaseOrders().catch(() => ({ purchaseOrders: [] })),
-        salesOrderService.getSalesOrders().catch(() => ({ salesOrders: [] }))
-      ])
-      setPurchaseOrders(poResponse.purchaseOrders || [])
-      setSalesOrders(soResponse.salesOrders || [])
+      let ordersData = []
+      let total = 0
+      
+      if (orderType === 'purchase') {
+        const response = await purchaseOrderService.getPurchaseOrders(page, itemsPerPage)
+        ordersData = response.purchaseOrders || []
+        total = response.total || 0
+      } else {
+        const response = await salesOrderService.getSalesOrders(page, itemsPerPage)
+        ordersData = response.salesOrders || []
+        total = response.total || 0
+      }
+      
+      setOrders(ordersData)
+      setTotalItems(total)
+      setTotalPages(Math.max(1, Math.ceil(total / itemsPerPage)))
+      setCurrentPage(page)
     } catch (error) {
-      console.error('Error loading orders:', error)
-      showToast('Failed to load orders', 'error')
+      console.error(`Error loading ${orderType} orders:`, error)
+      showToast(`Failed to load ${orderType} orders`, 'error')
     } finally {
       setLoading(false)
     }
@@ -60,409 +81,447 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation }) 
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    await loadOrders()
+    await loadOrders(1)
     setRefreshing(false)
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PENDING': return theme.warning
-      case 'CONFIRMED': return theme.info
-      case 'DELIVERED': return theme.success
-      case 'CANCELLED': return theme.error
-      default: return theme.textSecondary
-    }
+  const handlePageChange = (newPage: number) => {
+    loadOrders(newPage)
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'PENDING': return 'clock-outline'
-      case 'CONFIRMED': return 'check-circle-outline'
-      case 'DELIVERED': return 'truck-delivery'
-      case 'CANCELLED': return 'close-circle-outline'
-      default: return 'help-circle-outline'
-    }
+  const handleExportData = () => {
+    import('../../utils/exportUtils').then(({ exportToExcel, commonColumns }) => {
+      const isPurchase = orderType === 'purchase'
+      exportToExcel({
+        data: orders,
+        columns: isPurchase ? commonColumns.purchaseOrder : commonColumns.salesOrder,
+        filename: `${orderType}_orders_export`,
+        reportTitle: `${isPurchase ? 'Purchase' : 'Sales'} Orders Report`
+      }).then(success => {
+        if (success) showToast('Excel file ready to share', 'success')
+      })
+    })
   }
 
-  const handleUpdateStatus = async (orderId: string, status: string) => {
-    try {
-      if (orderType === 'purchase') {
-        const updated = await purchaseOrderService.updateStatus(orderId, status as any)
-        setPurchaseOrders(purchaseOrders.map(o => o.id === orderId ? updated : o))
-      } else {
-        const updated = await salesOrderService.updateStatus(orderId, status as any)
-        setSalesOrders(salesOrders.map(o => o.id === orderId ? updated : o))
+  const handleToggleFilters = () => {
+    showWarning('Filters', 'Advanced filtering functionality will be available in the next release.')
+  }
+
+  const handleDelete = (id: string) => {
+    showWarning(
+      'Delete Order',
+      `Are you sure you want to delete this order?`,
+      {
+        action: {
+          label: 'Delete',
+          onPress: () => {
+            setOrders(orders.filter(o => o.id !== id))
+            showToast('Order deleted', 'success')
+          }
+        }
       }
-      showToast('Order status updated', 'success')
-    } catch (error) {
-      console.error('Error updating status:', error)
-      showToast('Failed to update order status', 'error')
-    }
+    )
   }
+
 
   const renderOrderItem = ({ item }: { item: PurchaseOrder | SalesOrder }) => {
     const isPurchase = orderType === 'purchase'
     const status = item.status
+    const orderNumber = item.orderNumber
+    const date = new Date(item.orderDate).toLocaleDateString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric'
+    }).replace(/ /g, '-')
+    const amount = item.totalAmount
+    const itemCount = item.items?.length || 0
+    const partnerName = isPurchase ? (item as PurchaseOrder).supplierName : (item as SalesOrder).customerName
 
     return (
-      <Card style={styles.orderCard}>
-        <TouchableOpacity
-          onPress={() => {
-            if (isPurchase) {
-              navigation.navigate('PurchaseOrderDetail', { orderId: item.id })
-            } else {
-              navigation.navigate('SalesOrderDetail', { orderId: item.id })
-            }
-          }}
-        >
-          <View style={styles.orderHeader}>
-            <View style={styles.orderInfo}>
-              <Text style={[styles.orderNumber, { color: theme.text }]}>
-                {item.orderNumber}
-              </Text>
-              <Text style={[styles.partnerName, { color: theme.textSecondary }]}>
-                {isPurchase ? (item as PurchaseOrder).supplierName : (item as SalesOrder).customerName}
-              </Text>
-              <Text style={[styles.orderDate, { color: theme.textSecondary }]}>
-                {new Date(item.orderDate).toLocaleDateString()}
+      <Card style={[
+        commonStyles.glassCard, 
+        styles.orderCard,
+        viewMode === 'grid' && styles.gridCard
+      ]}>
+        <View style={styles.cardHeader}>
+          <View style={styles.badgeContainer}>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusText}>
+                {isPurchase ? (status === 'DELIVERED' ? 'DELIVERED' : status) : 'SOLD'}
               </Text>
             </View>
-            <View style={styles.orderStatus}>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(status) + '20' }]}>
-                <Icon 
-                  name={getStatusIcon(status)} 
-                  size={14} 
-                  color={getStatusColor(status)} 
-                />
-                <Text style={[styles.statusText, { color: getStatusColor(status) }]}>
-                  {status}
-                </Text>
+          </View>
+        </View>
+
+        <View style={styles.iconContainer}>
+          <Icon name={isPurchase ? 'local-shipping' : 'shopping-cart'} size={48} color={theme.textSecondary} />
+        </View>
+
+        <View style={styles.contentContainer}>
+          <Text style={styles.orderLabel}>ORDER #</Text>
+          <Text style={styles.orderNumber}>{orderNumber}</Text>
+
+          {isPurchase && (
+            <View style={styles.grid2x2}>
+              <View style={styles.gridItem}>
+                <Text style={styles.gridLabel}>Brand</Text>
+                <Text style={styles.gridValue}>{partnerName || 'N/A'}</Text>
+              </View>
+              <View style={styles.gridItem}>
+                <Text style={styles.gridLabel}>Amount</Text>
+                <Text style={styles.gridValue}>₹{amount.toLocaleString()}</Text>
+              </View>
+              <View style={styles.gridItem}>
+                <Text style={styles.gridLabel}>Date</Text>
+                <Text style={styles.gridValue}>{date}</Text>
+              </View>
+              <View style={styles.gridItem}>
+                <Text style={styles.gridLabel}>Items</Text>
+                <Text style={styles.gridValue}>{itemCount}</Text>
               </View>
             </View>
-          </View>
-          
-          <View style={styles.orderDetails}>
-            <Text style={[styles.orderAmount, { color: theme.text }]}>
-              ${item.totalAmount.toFixed(2)}
-            </Text>
-            <Text style={[styles.itemCount, { color: theme.textSecondary }]}>
-              {item.items.length} items
-            </Text>
-            {item.expectedDelivery && (
-              <Text style={[styles.deliveryDate, { color: theme.textSecondary }]}>
-                Expected: {new Date(item.expectedDelivery).toLocaleDateString()}
-              </Text>
-            )}
-          </View>
-
-          {status === 'PENDING' && (
-            <View style={styles.quickActions}>
-              <LoadingButton
-                title="Confirm"
-                onPress={() => handleUpdateStatus(item.id, 'CONFIRMED')}
-                variant="primary"
-                size="small"
-                style={{ flex: 1 }}
-              />
-              <LoadingButton
-                title="Cancel"
-                onPress={() => handleUpdateStatus(item.id, 'CANCELLED')}
-                variant="outline"
-                size="small"
-                style={{ flex: 1 }}
-              />
-            </View>
           )}
 
-          {status === 'CONFIRMED' && (
-            <View style={styles.quickActions}>
-              <LoadingButton
-                title="Mark Delivered"
-                onPress={() => navigation.navigate(isPurchase ? 'PurchaseOrderDeliver' : 'SalesOrderDeliver', { orderId: item.id })}
-                variant="primary"
-                size="small"
-                fullWidth
-              />
+          {!isPurchase && (
+            <View style={styles.gridList}>
+              <View style={styles.gridRow}>
+                <Text style={styles.gridLabelInline}>Date: </Text>
+                <Text style={styles.gridValueInline}>{date}</Text>
+                <Text style={[styles.gridLabelInline, { marginLeft: 24 }]}>Qty: </Text>
+                <Text style={styles.gridValueInline}>{itemCount}</Text>
+              </View>
             </View>
           )}
-        </TouchableOpacity>
+        </View>
+
+        <View style={styles.actionRow}>
+          <TouchableOpacity 
+            style={styles.outlineBtn}
+            onPress={() => navigation.navigate(isPurchase ? 'PurchaseOrderDetail' : 'SalesOrderDetail', { orderId: item.id })}
+          >
+            <Icon name="visibility" size={16} color={theme.text} />
+            <Text style={styles.outlineBtnText}>View</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.outlineBtn}>
+            <Icon name="edit" size={16} color={theme.text} />
+            <Text style={styles.outlineBtnText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item.id)}>
+            <Icon name="delete-outline" size={16} color={theme.error} />
+          </TouchableOpacity>
+        </View>
       </Card>
     )
   }
 
-  const renderSkeleton = () => (
-    <Card style={styles.orderCard}>
-      <Skeleton height={20} width="60%" style={{ marginBottom: spacing.sm }} />
-      <Skeleton height={16} width="80%" style={{ marginBottom: spacing.xs }} />
-      <Skeleton height={14} width="40%" />
-    </Card>
-  )
+  const renderOrderRow = ({ item }: { item: PurchaseOrder | SalesOrder }) => {
+    const isPurchase = orderType === 'purchase'
+    const status = item.status
+    const orderNumber = item.orderNumber
+    const date = new Date(item.orderDate).toLocaleDateString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric'
+    }).replace(/ /g, '-')
+    const amount = item.totalAmount
+    const partnerName = isPurchase ? (item as PurchaseOrder).supplierName : (item as SalesOrder).customerName
 
-  const FilterButton = ({ status, title }: { status: OrderStatus, title: string }) => (
-    <TouchableOpacity
-      style={[
-        styles.filterButton,
-        {
-          backgroundColor: filter === status ? theme.primary : 'transparent',
-          borderColor: theme.border,
-        }
-      ]}
-      onPress={() => setFilter(status)}
-    >
-      <Text style={[
-        styles.filterButtonText,
-        { color: filter === status ? theme.textInverse : theme.text }
-      ]}>
-        {title}
-      </Text>
-    </TouchableOpacity>
-  )
+    return (
+      <TouchableOpacity 
+        style={styles.tableRow}
+        onPress={() => navigation.navigate(isPurchase ? 'PurchaseOrderDetail' : 'SalesOrderDetail', { orderId: item.id })}
+        activeOpacity={0.7}
+      >
+        <View style={styles.colOrder}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{orderNumber}</Text>
+          <View style={[styles.statusDot, { backgroundColor: status === 'DELIVERED' ? theme.success : theme.primary }]} />
+        </View>
+        <View style={styles.colPartner}>
+          <Text style={styles.rowText} numberOfLines={1}>{partnerName || 'N/A'}</Text>
+        </View>
+        <View style={styles.colAmount}>
+          <Text style={styles.rowTextBold}>₹{amount.toLocaleString()}</Text>
+        </View>
+        <View style={styles.colDate}>
+          <Text style={styles.rowSubtitle}>{date}</Text>
+        </View>
+      </TouchableOpacity>
+    )
+  }
 
-  const orders: Array<PurchaseOrder | SalesOrder> = orderType === 'purchase' ? [...purchaseOrders] : [...salesOrders]
-  const filteredOrders = orders.filter(order => 
-    filter === 'ALL' || order.status === filter
-  )
+  const renderItem = ({ item }: { item: PurchaseOrder | SalesOrder }) => {
+    if (viewMode === 'list') return renderOrderRow({ item })
+    return renderOrderItem({ item })
+  }
+
+  const renderListHeader = () => {
+    if (viewMode !== 'list' || orders.length === 0) return null
+    return (
+      <View style={styles.tableHeader}>
+        <Text style={[styles.tableHeaderText, styles.colOrder]}>ORDER #</Text>
+        <Text style={[styles.tableHeaderText, styles.colPartner]}>PARTNER</Text>
+        <Text style={[styles.tableHeaderText, styles.colAmount]}>AMOUNT</Text>
+        <Text style={[styles.tableHeaderText, styles.colDate]}>DATE</Text>
+      </View>
+    )
+  }
+
+  const renderSkeleton = () => {
+    if (viewMode === 'list') {
+      return (
+        <View style={styles.tableRow}>
+          <View style={styles.colOrder}><Skeleton height={16} width="80%" /></View>
+          <View style={styles.colPartner}><Skeleton height={16} width="80%" /></View>
+          <View style={styles.colAmount}><Skeleton height={16} width="60%" /></View>
+          <View style={styles.colDate}><Skeleton height={14} width="80%" /></View>
+        </View>
+      )
+    }
+    return (
+      <Card style={[commonStyles.glassCard, styles.orderCard]}>
+        <View style={{ height: 180, alignItems: 'center', justifyContent: 'center' }}>
+          <Skeleton width={80} height={80} borderRadius={16} />
+        </View>
+        <View style={styles.contentContainer}>
+          <Skeleton width="40%" height={24} style={{ marginBottom: 16 }} />
+          <Skeleton width="100%" height={60} />
+        </View>
+      </Card>
+    )
+  }
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.background,
     },
-    content: {
-      flex: 1,
+    listContainer: {
       padding: spacing.base,
-    },
-    tabContainer: {
-      flexDirection: 'row',
-      marginBottom: spacing.base,
-      backgroundColor: theme.surface,
-      borderRadius: borderRadius.base,
-      padding: spacing.xs,
-    },
-    tab: {
-      flex: 1,
-      paddingHorizontal: spacing.base,
-      paddingVertical: spacing.sm,
-      borderRadius: borderRadius.sm,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    tabActive: {
-      backgroundColor: theme.primary,
-    },
-    tabText: {
-      fontSize: typography.fontSize.sm,
-      fontWeight: typography.fontWeight.medium,
-      color: theme.text,
-    },
-    tabTextActive: {
-      color: theme.textInverse,
-    },
-    filterContainer: {
-      flexDirection: 'row',
-      marginBottom: spacing.base,
-      gap: spacing.sm,
-      paddingHorizontal: spacing.xs,
-    },
-    filterButton: {
-      paddingHorizontal: spacing.base,
-      paddingVertical: spacing.sm,
-      borderRadius: 20,
-      borderWidth: 1,
-    },
-    filterButtonText: {
-      fontSize: typography.fontSize.xs,
-      fontWeight: typography.fontWeight.medium,
+      paddingBottom: 80,
     },
     orderCard: {
-      marginBottom: spacing.base,
+      marginBottom: spacing.md,
+      padding: 0,
+      borderRadius: 16,
+      overflow: 'hidden',
     },
-    orderHeader: {
+    cardHeader: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: spacing.sm,
+      justifyContent: 'flex-end',
+      padding: 12,
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      zIndex: 10,
     },
-    orderInfo: {
-      flex: 1,
-    },
-    orderNumber: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      marginBottom: spacing.xs,
-    },
-    partnerName: {
-      fontSize: typography.fontSize.sm,
-      marginBottom: spacing.xs,
-    },
-    orderDate: {
-      fontSize: typography.fontSize.xs,
-    },
-    orderStatus: {
-      alignItems: 'flex-end',
+    badgeContainer: {
+      flexDirection: 'row',
     },
     statusBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-      borderRadius: 12,
-      gap: spacing.xs,
+      backgroundColor: theme.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 16,
     },
     statusText: {
-      fontSize: typography.fontSize.xs,
-      fontWeight: typography.fontWeight.medium,
+      color: theme.primaryForeground,
+      fontSize: 10,
+      fontWeight: 'bold',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
-    orderDetails: {
-      borderTopWidth: 1,
-      borderTopColor: theme.border,
-      paddingTop: spacing.sm,
-      marginBottom: spacing.sm,
+    iconContainer: {
+      height: 180,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.02)',
     },
-    orderAmount: {
-      fontSize: typography.fontSize.lg,
-      fontWeight: typography.fontWeight.bold,
-      marginBottom: spacing.xs,
+    contentContainer: {
+      padding: 16,
     },
-    itemCount: {
-      fontSize: typography.fontSize.sm,
-      marginBottom: spacing.xs,
+    orderLabel: {
+      fontSize: 10,
+      color: theme.mutedForeground,
+      fontWeight: 'bold',
+      letterSpacing: 1,
+      marginBottom: 4,
     },
-    deliveryDate: {
-      fontSize: typography.fontSize.sm,
+    orderNumber: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 16,
     },
-    quickActions: {
+    grid2x2: {
       flexDirection: 'row',
-      gap: spacing.sm,
-      marginTop: spacing.sm,
+      flexWrap: 'wrap',
+      marginHorizontal: -8,
+    },
+    gridItem: {
+      width: '50%',
+      paddingHorizontal: 8,
+      marginBottom: 16,
+    },
+    gridLabel: {
+      fontSize: 12,
+      color: theme.mutedForeground,
+      marginBottom: 4,
+    },
+    gridValue: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: theme.text,
+    },
+    gridList: {
+      marginBottom: 16,
+    },
+    gridRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    gridLabelInline: {
+      fontSize: 12,
+      color: theme.mutedForeground,
+    },
+    gridValueInline: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.text,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      padding: 16,
+      paddingTop: 0,
+      gap: 12,
+    },
+    outlineBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingVertical: 10,
+      borderRadius: 12,
+      gap: 6,
+    },
+    outlineBtnText: {
+      color: theme.text,
+      fontWeight: 'bold',
+      fontSize: 12,
+    },
+    deleteBtn: {
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
     },
     fab: {
       position: 'absolute',
       right: spacing.base,
       bottom: spacing.base,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 64,
+      height: 64,
+      borderRadius: 32,
       backgroundColor: theme.primary,
       alignItems: 'center',
       justifyContent: 'center',
       elevation: 8,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
     },
-    emptyContainer: {
-      flex: 1,
+    tableHeader: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.surface,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+      marginTop: 8,
+    },
+    tableHeaderText: {
+      color: theme.mutedForeground,
+      fontSize: 10,
+      fontWeight: 'bold',
+      letterSpacing: 1,
+    },
+    tableRow: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: spacing['4xl'],
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: theme.card,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
     },
-    emptyText: {
-      fontSize: typography.fontSize.base,
-      color: theme.textSecondary,
-      textAlign: 'center',
-      marginTop: spacing.base,
+    colOrder: { flex: 1.2, flexDirection: 'row', alignItems: 'center', gap: 6 },
+    colPartner: { flex: 1.5, paddingRight: 8 },
+    colAmount: { flex: 1, alignItems: 'flex-end', paddingRight: 8 },
+    colDate: { flex: 1, alignItems: 'flex-end' },
+    statusDot: { width: 6, height: 6, borderRadius: 3 },
+    rowTitle: {
+      color: theme.text,
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    rowSubtitle: {
+      color: theme.mutedForeground,
+      fontSize: 10,
+    },
+    rowText: {
+      color: theme.text,
+      fontSize: 12,
+    },
+    rowTextBold: {
+      color: theme.text,
+      fontSize: 12,
+      fontWeight: 'bold',
     },
   })
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
-        title="Orders"
-        showBack
-        navigation={navigation}
-        rightComponent={
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            <Icon name={isDark ? 'light-mode' : 'dark-mode'} size={18} color={theme.text} />
-            <Switch
-              value={isDark}
-              onValueChange={toggleTheme}
-              trackColor={{ false: theme.border, true: theme.primary + '50' }}
-              thumbColor={isDark ? theme.primary : theme.textSecondary}
-              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-            />
-          </View>
-        }
+    <SafeAreaView style={styles.container} edges={['right', 'left']}>
+      <MainHeader />
+      <ScreenActionBar
+        title={orderType === 'purchase' ? 'Purchase Orders' : 'Sales Orders'}
+        primaryActionLabel="New Order"
+        onPrimaryAction={() => navigation.navigate(orderType === 'purchase' ? 'PurchaseOrderForm' : 'SalesOrderForm')}
+        itemCount={totalItems}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onExport={handleExportData}
+        onToggleFilters={handleToggleFilters}
       />
       
-      <View style={styles.content}>
-        {/* Tab Switcher */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, orderType === 'purchase' && styles.tabActive]}
-            onPress={() => {
-              setOrderType('purchase')
-              setFilter('ALL')
-            }}
-          >
-            <Icon 
-              name="shopping-cart" 
-              size={20} 
-              color={orderType === 'purchase' ? theme.textInverse : theme.text}
+      <FlatList
+        data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : orders}
+        renderItem={loading ? renderSkeleton : renderItem}
+        keyExtractor={(item, index) => loading ? `skel-${index}` : item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={renderListHeader}
+        ListFooterComponent={
+          !loading && orders.length > 0 ? (
+            <PaginationControl
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={handlePageChange}
             />
-            <Text style={[styles.tabText, orderType === 'purchase' && styles.tabTextActive]}>
-              Purchase
-            </Text>
-          </TouchableOpacity>
+          ) : null
+        }
+      />
 
-          <TouchableOpacity
-            style={[styles.tab, orderType === 'sales' && styles.tabActive]}
-            onPress={() => {
-              setOrderType('sales')
-              setFilter('ALL')
-            }}
-          >
-            <Icon 
-              name="local-shipping" 
-              size={20} 
-              color={orderType === 'sales' ? theme.textInverse : theme.text}
-            />
-            <Text style={[styles.tabText, orderType === 'sales' && styles.tabTextActive]}>
-              Sales
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Filter Bar */}
-        <View style={styles.filterContainer}>
-          <FilterButton status="ALL" title="All" />
-          <FilterButton status="PENDING" title="Pending" />
-          <FilterButton status="CONFIRMED" title="Confirmed" />
-          <FilterButton status="DELIVERED" title="Delivered" />
-        </View>
-
-        {/* Orders List */}
-        <FlatList
-          data={loading ? Array(5).fill({}) : filteredOrders}
-          renderItem={loading ? renderSkeleton : renderOrderItem}
-          keyExtractor={(item, index) => loading ? index.toString() : item.id}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            !loading ? (
-              <View style={styles.emptyContainer}>
-                <Icon name="file-document-multiple" size={64} color={theme.textSecondary} />
-                <Text style={styles.emptyText}>
-                  {filter === 'ALL' 
-                    ? `No ${orderType} orders available` 
-                    : `No ${filter.toLowerCase()} orders`
-                  }
-                </Text>
-              </View>
-            ) : null
-          }
-        />
-      </View>
-
-      {/* FAB - Create New Order */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => navigation.navigate(orderType === 'purchase' ? 'PurchaseOrderForm' : 'SalesOrderForm')}
       >
-        <Icon name="add" size={28} color={theme.textInverse} />
+        <Icon name="add" size={24} color={theme.textInverse} />
       </TouchableOpacity>
     </SafeAreaView>
   )

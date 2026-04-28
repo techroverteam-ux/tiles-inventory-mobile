@@ -4,9 +4,8 @@ import { createStackNavigator } from '@react-navigation/stack'
 import { createDrawerNavigator } from '@react-navigation/drawer'
 import { useTheme } from '../context/ThemeContext'
 import { CustomDrawerContent } from '../components/navigation/CustomDrawerContent'
-import { BottomNavBar } from '../components/navigation/BottomNavBar'
-import { DashboardStack } from './stacks/DashboardStack'
-import { InventoryStack } from './stacks/InventoryStack'
+import { MainHeader } from '../components/navigation/MainHeader'
+import { BottomTabNavigator } from './BottomTabNavigator'
 import { ProductsStack } from './stacks/ProductsStack'
 import { OrdersStack } from './stacks/OrdersStack'
 import { CustomersStack } from './stacks/CustomersStack'
@@ -15,7 +14,9 @@ import { ProductFormScreen } from '../screens/products/ProductFormScreen'
 import { ProductListScreen } from '../screens/products/ProductListScreenComplete'
 import { OrderFormScreen } from '../screens/orders/OrderFormScreen'
 import { PurchaseOrderListScreen } from '../screens/orders/PurchaseOrderListScreen'
+import { PurchaseOrderFormScreen } from '../screens/orders/PurchaseOrderFormScreen'
 import { SalesOrderListScreen } from '../screens/orders/SalesOrderListScreen'
+import { SalesOrderFormScreen } from '../screens/orders/SalesOrderFormScreen'
 import { BrandManagementScreen } from '../screens/settings/BrandManagementScreen'
 import { CategoryManagementScreen } from '../screens/settings/CategoryManagementScreen'
 import { SizeManagementScreen } from '../screens/settings/SizeManagementScreen'
@@ -53,17 +54,13 @@ const DrawerNavigator: React.FC = () => {
           overlayColor: 'rgba(0, 0, 0, 0.5)',
         }}
       >
-        <Drawer.Screen name="Dashboard" component={EnhancedDashboardScreen} />
+        <Drawer.Screen name="Tabs" component={BottomTabNavigator} />
         <Drawer.Screen name="GlobalSearch" component={GlobalSearchScreen} />
         <Drawer.Screen name="BrandManagement" component={BrandManagementScreen} />
         <Drawer.Screen name="CategoryManagement" component={CategoryManagementScreen} />
         <Drawer.Screen name="CollectionManagement" component={CollectionManagementScreen} />
         <Drawer.Screen name="SizeManagement" component={SizeManagementScreen} />
-        <Drawer.Screen name="Products" component={ProductsStack} />
-        <Drawer.Screen name="Inventory" component={InventoryStack} />
         <Drawer.Screen name="LocationManagement" component={LocationManagementScreen} />
-        <Drawer.Screen name="PurchaseOrders" component={OrdersStack} />
-        <Drawer.Screen name="SalesOrders" component={OrdersStack} />
         <Drawer.Screen name="Customers" component={CustomersStack} />
         <Drawer.Screen name="Notifications" component={NotificationsScreen} />
         <Drawer.Screen name="Reports" component={ReportsScreen} />
@@ -71,7 +68,6 @@ const DrawerNavigator: React.FC = () => {
         <Drawer.Screen name="AdminFunctions" component={AdminFunctionsScreen} />
         <Drawer.Screen name="Settings" component={SettingsScreen} />
       </Drawer.Navigator>
-      <BottomNavBar />
     </View>
   )
 }
@@ -97,11 +93,7 @@ export const MainNavigator: React.FC = () => {
         <Stack.Screen 
           name="ProductForm" 
           component={ProductFormScreen}
-          options={{ 
-            title: 'Product',
-            headerStyle: { backgroundColor: theme.surface },
-            headerTintColor: theme.text
-          }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen 
           name="ProductList" 
@@ -131,12 +123,28 @@ export const MainNavigator: React.FC = () => {
           }}
         />
         <Stack.Screen 
+          name="PurchaseOrderForm" 
+          component={PurchaseOrderFormScreen}
+          options={{ 
+            title: 'Purchase Order',
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen 
           name="SalesOrderList" 
           component={SalesOrderListScreen}
           options={{ 
             title: 'Sales Orders',
             headerStyle: { backgroundColor: theme.surface },
             headerTintColor: theme.text
+          }}
+        />
+        <Stack.Screen 
+          name="SalesOrderForm" 
+          component={SalesOrderFormScreen}
+          options={{ 
+            title: 'Sales Order',
+            headerShown: false,
           }}
         />
         <Stack.Screen 

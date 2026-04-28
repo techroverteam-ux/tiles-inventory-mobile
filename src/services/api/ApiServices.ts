@@ -304,24 +304,37 @@ export interface Brand {
   name: string
   description?: string
   logo?: string
-  isActive?: boolean
+  isActive: boolean
   createdAt: string
-  updatedAt?: string
+  updatedAt: string
+  createdBy?: { name: string }
+  updatedBy?: { name: string }
+  _count?: { products: number }
 }
 
 export interface BrandResponse {
   brands: Brand[]
   total: number
+  totalCount: number
+  totalPages: number
+  currentPage: number
 }
 
 export const brandService = {
-  getBrands: async (page: number = 1, limit: number = 50): Promise<BrandResponse> => {
+  getBrands: async (params: {
+    page?: number
+    limit?: number
+    search?: string
+    isActive?: string
+    dateFrom?: string
+    dateTo?: string
+  } = {}): Promise<BrandResponse> => {
     try {
-      const response = await apiClient.get('/brands', { params: { page, limit } })
+      const response = await apiClient.get('/brands', { params: { page: 1, limit: 20, ...params } })
       return response.data
     } catch (error) {
       console.error('Failed to fetch brands:', error)
-      return { brands: [], total: 0 }
+      return { brands: [], total: 0, totalCount: 0, totalPages: 0, currentPage: 1 }
     }
   },
 
@@ -949,6 +962,52 @@ export const inventoryService = {
         pagination: { page: filters.page || 1, pages: 1, total: 0 },
       }
     }
+  },
+}
+
+export interface Customer {
+  id: string
+  name: string
+  email?: string
+  phone?: string
+  address?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CustomerResponse {
+  customers: Customer[]
+  total: number
+}
+
+export const customerService = {
+  getCustomers: async (page = 1, limit = 20): Promise<CustomerResponse> => {
+    try {
+      const response = await apiClient.get('/customers', { params: { page, limit } })
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch customers:', error)
+      return { customers: [], total: 0 }
+    }
+  },
+
+  getCustomer: async (id: string): Promise<Customer> => {
+    const response = await apiClient.get(`/customers/${id}`)
+    return response.data
+  },
+
+  createCustomer: async (data: Partial<Customer>): Promise<Customer> => {
+    const response = await apiClient.post('/customers', data)
+    return response.data
+  },
+
+  updateCustomer: async (id: string, data: Partial<Customer>): Promise<Customer> => {
+    const response = await apiClient.put(`/customers/${id}`, data)
+    return response.data
+  },
+
+  deleteCustomer: async (id: string): Promise<void> => {
+    await apiClient.delete(`/customers/${id}`)
   },
 }
 

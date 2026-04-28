@@ -10,7 +10,7 @@ import { OrdersStackParamList } from '../types'
 
 const Stack = createStackNavigator<OrdersStackParamList>()
 
-export const OrdersStack: React.FC = () => {
+export const OrdersStack: React.FC<any> = (props) => {
   const { theme } = useTheme()
 
   return (
@@ -24,7 +24,8 @@ export const OrdersStack: React.FC = () => {
       <Stack.Screen 
         name="OrderList" 
         component={OrderListScreen}
-        options={{ title: 'Orders' }}
+        options={{ headerShown: false }}
+        initialParams={{ orderType: (props as any)?.route?.params?.orderType || 'purchase' }}
       />
       <Stack.Screen 
         name="OrderDetail" 

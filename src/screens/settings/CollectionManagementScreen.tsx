@@ -19,7 +19,7 @@ import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { LoadingSpinner } from '../../components/loading'
 import { collectionService, Collection } from '../../services/api/ApiServices'
-import { spacing, typography } from '../../theme'
+import { spacing, typography, borderRadius } from '../../theme'
 
 interface CollectionManagementScreenProps {
   navigation: any

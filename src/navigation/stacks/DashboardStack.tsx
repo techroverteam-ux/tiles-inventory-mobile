@@ -1,7 +1,7 @@
 import React from 'react'
 import { createStackNavigator } from '@react-navigation/stack'
 import { useTheme } from '../../context/ThemeContext'
-import { DashboardScreen } from '../../screens/dashboard/DashboardScreen'
+import { EnhancedDashboardScreen } from '../../screens/dashboard/EnhancedDashboardScreen'
 import { NotificationsScreen } from '../../screens/notifications/NotificationsScreen'
 import { Header } from '../../components/navigation/Header'
 import { DashboardStackParamList } from '../types'
@@ -21,7 +21,7 @@ export const DashboardStack: React.FC = () => {
     >
       <Stack.Screen 
         name="DashboardMain" 
-        component={DashboardScreen}
+        component={EnhancedDashboardScreen}
         options={{ title: 'Dashboard' }}
       />
       <Stack.Screen 

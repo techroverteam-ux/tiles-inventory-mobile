@@ -6,12 +6,31 @@ import { CompositeNavigationProp, RouteProp } from '@react-navigation/native'
 export type RootStackParamList = {
   Auth: undefined
   Main: undefined
+  Website: undefined
+}
+
+// Website Stack Params
+export type WebsiteStackParamList = {
+  WebsiteHome: undefined
+  WebsiteProducts: { categoryId?: string, brandId?: string, sizeId?: string, searchQuery?: string }
+  WebsiteProductDetail: { productId: string }
+  WebsiteCart: undefined
+  WebsiteWishlist: undefined
 }
 
 // Auth Stack Params
 export type AuthStackParamList = {
   Login: undefined
   ForgotPassword: undefined
+}
+
+// Bottom Tab Params
+export type BottomTabParamList = {
+  DashboardTab: undefined
+  ProductsTab: undefined
+  InventoryTab: undefined
+  PurchaseTab: undefined
+  SalesTab: undefined
 }
 
 // Main Stack Params
@@ -45,16 +64,12 @@ export type MainStackParamList = {
 
 // Drawer Params
 export type DrawerParamList = {
-  Dashboard: undefined
+  Tabs: undefined // Represents the bottom tab navigator
   BrandManagement: undefined
   CategoryManagement: undefined
   CollectionManagement: undefined
   SizeManagement: undefined
-  Products: undefined
-  Inventory: undefined
   LocationManagement: undefined
-  PurchaseOrders: undefined
-  SalesOrders: undefined
   Customers: undefined
   Notifications: undefined
   GlobalSearch: undefined

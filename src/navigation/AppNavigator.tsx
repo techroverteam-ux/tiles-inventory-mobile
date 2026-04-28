@@ -6,7 +6,8 @@ import { useTheme } from '../context/ThemeContext'
 import { useSession } from '../context/SessionContext'
 import { AuthNavigator } from './AuthNavigator'
 import { MainNavigator } from './MainNavigator'
-import { LoadingScreen } from '../screens/LoadingScreen'
+import { WebsiteNavigator } from './WebsiteNavigator'
+import { LoadingScreen } from '../components/loading/LoadingScreen'
 import { RootStackParamList } from './types'
 
 const Stack = createStackNavigator<RootStackParamList>()
@@ -38,13 +39,17 @@ export const AppNavigator: React.FC = () => {
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.surface}
+        translucent={false}
       />
       <NavigationContainer theme={navigationTheme}>
         <Stack.Navigator id="RootStack" screenOptions={{ headerShown: false }}>
           {isAuthenticated ? (
             <Stack.Screen name="Main" component={MainNavigator} />
           ) : (
-            <Stack.Screen name="Auth" component={AuthNavigator} />
+            <>
+              <Stack.Screen name="Auth" component={AuthNavigator} />
+              <Stack.Screen name="Website" component={WebsiteNavigator} />
+            </>
           )}
         </Stack.Navigator>
       </NavigationContainer>

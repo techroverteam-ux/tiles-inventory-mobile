@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -9,9 +9,11 @@ import {
   RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
-import { Header } from '../../components/navigation/Header'
+import { ScreenActionBar } from '../../components/common/ScreenActionBar'
+import { getCommonStyles } from '../../theme/commonStyles'
 import { Card } from '../../components/common/Card'
 import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
@@ -29,13 +31,22 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<'ALL' | 'DRAFT' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED'>('ALL')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
+  const commonStyles = getCommonStyles(theme)
 
   useEffect(() => {
     loadOrders()
   }, [])
 
+  useFocusEffect(
+    useCallback(() => {
+      loadOrders()
+    }, [])
+  )
+
   const loadOrders = async () => {
     try {
+      setLoading(true)
       const response = await salesOrderService.getSalesOrders()
       setOrders(response.salesOrders)
     } catch (error) {
@@ -76,86 +87,46 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
   )
 
   const renderOrder = ({ item }: { item: SalesOrder }) => (
-    <Card style={styles.orderCard}>
-      <TouchableOpacity
-        onPress={() => navigation.navigate('SalesOrderDetail', { orderId: item.id })}
-      >
-        <View style={styles.orderHeader}>
-          <View style={styles.orderInfo}>
-            <Text style={[styles.orderNumber, { color: theme.text }]}>
-              {item.orderNumber}
-            </Text>
-            <Text style={[styles.customerName, { color: theme.textSecondary }]}>
-              {item.customerName}
-            </Text>
-            <Text style={[styles.orderDate, { color: theme.textSecondary }]}>
-              {new Date(item.orderDate).toLocaleDateString()}
-            </Text>
-          </View>
-          <View style={styles.orderStatus}>
-            <View style={[styles.statusBadge, { backgroundColor: withOpacity(getStatusColor(item.status), 0.12) }]}>
-              <Icon 
-                name={getStatusIcon(item.status)} 
-                size={14} 
-                color={getStatusColor(item.status)} 
-              />
-              <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-                {item.status}
-              </Text>
-            </View>
-          </View>
+    <Card style={[commonStyles.glassCard, styles.orderCard]}>
+      {/* Top right badge */}
+      <View style={styles.badgeContainer}>
+        <View style={styles.soldBadge}>
+          <Text style={styles.soldBadgeText}>SOLD</Text>
         </View>
+      </View>
+
+      {/* Center Icon */}
+      <View style={styles.centerIconWrap}>
+        <Icon name="shopping-cart" size={48} color={theme.border} />
+      </View>
+
+      {/* Details */}
+      <View style={styles.detailsWrap}>
+        <Text style={styles.orderNumber}>{item.orderNumber}</Text>
+        <View style={styles.divider} />
         
-        <View style={styles.orderDetails}>
-          <Text style={[styles.orderAmount, { color: theme.text }]}>
-            ${item.totalAmount.toFixed(2)}
-          </Text>
-          <Text style={[styles.itemCount, { color: theme.textSecondary }]}>
-            {item.items.length} items
-          </Text>
-          {item.deliveryDate && (
-            <Text style={[styles.deliveryDate, { color: theme.textSecondary }]}>
-              Delivery: {new Date(item.deliveryDate).toLocaleDateString()}
-            </Text>
-          )}
-          {item.customerPhone && (
-            <Text style={[styles.customerContact, { color: theme.textSecondary }]}>
-              {item.customerPhone}
-            </Text>
-          )}
+        <View style={styles.rowBetween}>
+          <Text style={styles.metaLabel}>Date: <Text style={styles.metaValue}>{new Date(item.orderDate).toLocaleDateString()}</Text></Text>
+          <Text style={styles.metaLabel}>Qty: <Text style={styles.metaValue}>{item.items.length}</Text></Text>
         </View>
+      </View>
 
-        {item.status === 'DRAFT' && (
-          <View style={styles.quickActions}>
-            <LoadingButton
-              title="Edit"
-              onPress={() => navigation.navigate('SalesOrderForm', { order: item })}
-              variant="outline"
-              size="small"
-              style={{ flex: 1 }}
-            />
-            <LoadingButton
-              title="Confirm"
-              onPress={() => handleUpdateStatus(item.id, 'CONFIRMED')}
-              variant="primary"
-              size="small"
-              style={{ flex: 1 }}
-            />
-          </View>
-        )}
+      {/* Actions */}
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('SalesOrderDetail', { orderId: item.id })}>
+          <Icon name="visibility" size={16} color={theme.text} />
+          <Text style={styles.actionBtnText}>View</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('SalesOrderForm', { orderId: item.id, order: item })}>
+          <Icon name="edit" size={16} color={theme.text} />
+          <Text style={styles.actionBtnText}>Edit</Text>
+        </TouchableOpacity>
 
-        {item.status === 'CONFIRMED' && (
-          <View style={styles.quickActions}>
-            <LoadingButton
-              title="Mark Delivered"
-              onPress={() => handleUpdateStatus(item.id, 'DELIVERED')}
-              variant="primary"
-              size="small"
-              fullWidth
-            />
-          </View>
-        )}
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.deleteBtn}>
+          <Icon name="delete-outline" size={16} color={theme.error} />
+        </TouchableOpacity>
+      </View>
     </Card>
   )
 
@@ -225,13 +196,91 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
       fontWeight: typography.fontWeight.medium,
     },
     orderCard: {
-      marginBottom: spacing.base,
+      marginBottom: spacing.md,
+      padding: 0,
+      borderRadius: 16,
+      overflow: 'hidden',
     },
-    orderHeader: {
+    badgeContainer: {
+      alignItems: 'flex-end',
+      padding: 16,
+    },
+    soldBadge: {
+      backgroundColor: theme.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 16,
+    },
+    soldBadgeText: {
+      color: theme.primaryForeground,
+      fontSize: 10,
+      fontWeight: 'bold',
+      letterSpacing: 1,
+    },
+    centerIconWrap: {
+      alignItems: 'center',
+      paddingVertical: 20,
+    },
+    detailsWrap: {
+      paddingHorizontal: 16,
+    },
+    orderNumber: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: theme.text,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: theme.border,
+      width: 24,
+      marginVertical: 12,
+    },
+    rowBetween: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: spacing.sm,
+      alignItems: 'center',
+    },
+    metaLabel: {
+      fontSize: 12,
+      color: theme.mutedForeground,
+      fontWeight: '500',
+    },
+    metaValue: {
+      color: theme.text,
+      fontWeight: '700',
+    },
+    actionRow: {
+      flexDirection: 'row',
+      gap: 12,
+      padding: 16,
+      paddingTop: 24,
+    },
+    actionBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      paddingVertical: 10,
+      gap: 6,
+    },
+    actionBtnText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.text,
+    },
+    deleteBtn: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
     },
     orderInfo: {
       flex: 1,
@@ -293,18 +342,18 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
     fab: {
       position: 'absolute',
       right: spacing.base,
-      bottom: spacing.base,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      bottom: 24, // adjust for bottom nav
+      width: 64,
+      height: 64,
+      borderRadius: 32,
       backgroundColor: theme.primary,
       alignItems: 'center',
       justifyContent: 'center',
       elevation: 8,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
     },
     emptyContainer: {
       flex: 1,
@@ -321,21 +370,17 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
   })
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['right', 'left']}>
+      <ScreenActionBar
         title="Sales Orders"
-        showBack
-        onBackPress={() => navigation.goBack()}
+        primaryActionLabel="New Order"
+        onPrimaryAction={() => navigation.navigate('SalesOrderForm')}
+        itemCount={filteredOrders.length}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
       />
       
       <View style={styles.content}>
-        <View style={styles.filterContainer}>
-          <FilterButton status="ALL" title="All" />
-          <FilterButton status="DRAFT" title="Draft" />
-          <FilterButton status="CONFIRMED" title="Confirmed" />
-          <FilterButton status="DELIVERED" title="Delivered" />
-        </View>
-
         <FlatList
           data={loading ? Array(5).fill({}) : filteredOrders}
           renderItem={loading ? renderSkeleton : renderOrder}

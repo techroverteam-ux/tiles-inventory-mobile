@@ -23,7 +23,7 @@ export const InventoryStack: React.FC = () => {
       <Stack.Screen 
         name="InventoryList" 
         component={InventoryListScreen}
-        options={{ title: 'Inventory' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="InventoryDetail" 
@@ -33,7 +33,7 @@ export const InventoryStack: React.FC = () => {
       <Stack.Screen 
         name="StockUpdate" 
         component={StockUpdateScreen}
-        options={{ title: 'Update Stock' }}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   )

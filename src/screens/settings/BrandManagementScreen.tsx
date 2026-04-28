@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -11,14 +11,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
-import { Header } from '../../components/navigation/Header'
+import { MainHeader } from '../../components/navigation/MainHeader'
+import { ScreenActionBar } from '../../components/common/ScreenActionBar'
 import { Card } from '../../components/common/Card'
-import { TextInput } from '../../components/common/TextInput'
-import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { brandService, Brand } from '../../services/api/ApiServices'
-import { spacing, typography } from '../../theme'
+import { spacing } from '../../theme'
 import { withOpacity } from '../../utils/colorUtils'
+import { getCommonStyles } from '../../theme/commonStyles'
+import { FormModal } from '../../components/common/FormModal'
+import { FormField, ActiveStatusToggle, FormActions } from '../../components/common/FormComponents'
+import { useFocusEffect } from '@react-navigation/native'
 
 interface BrandManagementScreenProps {
   navigation: any
@@ -31,12 +34,14 @@ export const BrandManagementScreen: React.FC<BrandManagementScreenProps> = ({ na
   const [refreshing, setRefreshing] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null)
-  const [formData, setFormData] = useState({ name: '', description: '' })
+  const [formData, setFormData] = useState({ name: '', description: '', isActive: true })
   const [submitting, setSubmitting] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
+  const commonStyles = getCommonStyles(theme)
 
-  useEffect(() => {
-    loadBrands()
-  }, [])
+  useEffect(() => { loadBrands() }, [])
+
+  useFocusEffect(useCallback(() => { loadBrands() }, []))
 
   const loadBrands = async () => {
     try {
@@ -64,15 +69,12 @@ export const BrandManagementScreen: React.FC<BrandManagementScreenProps> = ({ na
     setSubmitting(true)
     try {
       if (editingBrand) {
-        const updated = await brandService.updateBrand(editingBrand.id, formData)
-        setBrands(brands.map(b => b.id === editingBrand.id ? updated : b))
-        Alert.alert('Success', 'Brand updated successfully')
+        await brandService.updateBrand(editingBrand.id, formData)
       } else {
-        const newBrand = await brandService.createBrand(formData)
-        setBrands([newBrand, ...brands])
-        Alert.alert('Success', 'Brand created successfully')
+        await brandService.createBrand({ ...formData, isActive: formData.isActive })
       }
       resetForm()
+      await loadBrands()
     } catch (error) {
       Alert.alert('Error', 'Failed to save brand')
     } finally {
@@ -82,7 +84,7 @@ export const BrandManagementScreen: React.FC<BrandManagementScreenProps> = ({ na
 
   const handleEdit = (brand: Brand) => {
     setEditingBrand(brand)
-    setFormData({ name: brand.name, description: brand.description || '' })
+    setFormData({ name: brand.name, description: brand.description || '', isActive: brand.isActive })
     setShowAddForm(true)
   }
 
@@ -112,57 +114,70 @@ export const BrandManagementScreen: React.FC<BrandManagementScreenProps> = ({ na
   }
 
   const resetForm = () => {
-    setFormData({ name: '', description: '' })
+    setFormData({ name: '', description: '', isActive: true })
     setEditingBrand(null)
     setShowAddForm(false)
   }
 
   const renderBrand = ({ item }: { item: Brand }) => (
-    <Card style={styles.brandCard}>
-      <View style={styles.brandHeader}>
-        <View style={styles.brandInfo}>
-          <Text style={[styles.brandName, { color: theme.text }]}>{item.name}</Text>
-          {item.description && (
-            <Text style={[styles.brandDescription, { color: theme.textSecondary }]}>
-              {item.description}
-            </Text>
-          )}
-          <Text style={[styles.brandMeta, { color: theme.textSecondary }]}>
-            Created: {new Date(item.createdAt).toLocaleDateString()}
+    <Card style={[commonStyles.glassCard, styles.brandCard]} padding="none">
+      <View style={styles.cardTopRow}>
+        <Text style={styles.brandName}>{item.name}</Text>
+        <View style={[styles.statusBadge, { 
+          backgroundColor: item.isActive ? withOpacity(theme.primary, 0.15) : withOpacity(theme.error, 0.15)
+        }]}>
+          <Text style={[styles.statusText, { 
+            color: item.isActive ? theme.primary : theme.error 
+          }]}>
+            {item.isActive ? 'Active' : 'Inactive'}
           </Text>
         </View>
-        <View style={styles.brandActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.primary }]}
-            onPress={() => handleEdit(item)}
-          >
-            <Icon name="edit" size={16} color="#ffffff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.error }]}
-            onPress={() => handleDelete(item)}
-          >
-            <Icon name="delete" size={16} color="#ffffff" />
-          </TouchableOpacity>
+      </View>
+      
+      <View style={styles.productCountRow}>
+        <Icon name="inventory-2" size={12} color={theme.mutedForeground} />
+        <Text style={styles.productCountText}>0 Products</Text>
+      </View>
+
+      <View style={styles.detailsBlock}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Created:</Text>
+          <Text style={styles.detailValue}>{new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-')}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Updated:</Text>
+          <Text style={styles.detailValue}>N/A</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>By:</Text>
+          <Text style={styles.detailValue}>Admin User</Text>
         </View>
       </View>
-      <View style={[styles.statusBadge, { 
-        backgroundColor: item.isActive ? withOpacity(theme.success, 0.12) : withOpacity(theme.error, 0.12)
-      }]}>
-        <Text style={[styles.statusText, { 
-          color: item.isActive ? theme.success : theme.error 
-        }]}>
-          {item.isActive ? 'Active' : 'Inactive'}
-        </Text>
+
+      <View style={styles.actionsRow}>
+        <TouchableOpacity
+          style={styles.editBtn}
+          onPress={() => handleEdit(item)}
+        >
+          <Icon name="edit" size={14} color={theme.text} />
+          <Text style={styles.editBtnText}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={() => handleDelete(item)}
+        >
+          <Icon name="delete" size={14} color="#ffffff" />
+          <Text style={styles.deleteBtnText}>Delete</Text>
+        </TouchableOpacity>
       </View>
     </Card>
   )
 
   const renderSkeleton = () => (
-    <Card style={styles.brandCard}>
-      <Skeleton height={20} width="60%" style={{ marginBottom: spacing.sm }} />
-      <Skeleton height={16} width="80%" style={{ marginBottom: spacing.xs }} />
-      <Skeleton height={14} width="40%" />
+    <Card style={[commonStyles.glassCard, styles.brandCard]} padding="base">
+      <Skeleton height={24} width="40%" style={{ marginBottom: spacing.md }} />
+      <Skeleton height={60} width="100%" style={{ marginBottom: spacing.md }} />
+      <Skeleton height={36} width="100%" />
     </Card>
   )
 
@@ -173,154 +188,192 @@ export const BrandManagementScreen: React.FC<BrandManagementScreenProps> = ({ na
     },
     content: {
       flex: 1,
-      padding: spacing.base,
+    },
+    listContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 80,
     },
     brandCard: {
-      marginBottom: spacing.base,
+      marginBottom: 16,
+      borderRadius: 24,
+      overflow: 'hidden',
     },
-    brandHeader: {
+    cardTopRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: spacing.sm,
-    },
-    brandInfo: {
-      flex: 1,
-      marginRight: spacing.base,
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      marginBottom: 16,
     },
     brandName: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      marginBottom: spacing.xs,
-    },
-    brandDescription: {
-      fontSize: typography.fontSize.sm,
-      marginBottom: spacing.xs,
-    },
-    brandMeta: {
-      fontSize: typography.fontSize.xs,
-    },
-    brandActions: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-    },
-    actionButton: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
+      fontSize: 16,
+      fontWeight: '900',
+      color: theme.text,
+      textTransform: 'uppercase',
+      letterSpacing: -0.5,
     },
     statusBadge: {
-      alignSelf: 'flex-start',
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
       borderRadius: 12,
     },
     statusText: {
-      fontSize: typography.fontSize.xs,
-      fontWeight: typography.fontWeight.medium,
+      fontSize: 10,
+      fontWeight: '700',
     },
-    fab: {
-      position: 'absolute',
-      right: spacing.base,
-      bottom: spacing.base,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: theme.primary,
+    productCountRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      gap: 6,
+      marginBottom: 16,
+    },
+    productCountText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: theme.mutedForeground,
+    },
+    detailsBlock: {
+      backgroundColor: 'rgba(0,0,0,0.2)',
+      marginHorizontal: 12,
+      padding: 12,
+      borderRadius: 12,
+      gap: 4,
+    },
+    detailRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    detailLabel: {
+      fontSize: 11,
+      color: theme.mutedForeground,
+    },
+    detailValue: {
+      fontSize: 11,
+      color: theme.text,
+      fontWeight: '700',
+    },
+    actionsRow: {
+      flexDirection: 'row',
+      padding: 12,
+      gap: 12,
+    },
+    editBtn: {
+      flex: 1,
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      elevation: 8,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
+      gap: 6,
+      paddingVertical: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+      backgroundColor: theme.surface,
+    },
+    editBtnText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.text,
+    },
+    deleteBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: theme.error,
+    },
+    deleteBtnText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#ffffff',
     },
     formCard: {
-      marginBottom: spacing.base,
+      marginHorizontal: 16,
+      marginBottom: 16,
     },
     formTitle: {
-      fontSize: typography.fontSize.lg,
-      fontWeight: typography.fontWeight.semibold,
+      fontSize: 18,
+      fontWeight: '700',
       color: theme.text,
-      marginBottom: spacing.base,
+      marginBottom: 16,
     },
     formActions: {
       flexDirection: 'row',
-      gap: spacing.base,
-      marginTop: spacing.base,
+      gap: 12,
+      marginTop: 16,
     },
     emptyContainer: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: spacing['4xl'],
+      paddingVertical: 60,
     },
     emptyText: {
-      fontSize: typography.fontSize.base,
-      color: theme.textSecondary,
-      textAlign: 'center',
-      marginTop: spacing.base,
+      fontSize: 14,
+      color: theme.mutedForeground,
+      marginTop: 16,
     },
   })
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
-        title="Brand Management"
-        showBack
-        onBackPress={() => navigation.goBack()}
-      />
+    <SafeAreaView style={styles.container} edges={['right', 'left']}>
+      <MainHeader />
       
       <View style={styles.content}>
-        {showAddForm && (
-          <Card style={styles.formCard} padding="lg">
-            <Text style={styles.formTitle}>
-              {editingBrand ? 'Edit Brand' : 'Add New Brand'}
-            </Text>
-            
-            <TextInput
-              label="Brand Name"
-              value={formData.name}
-              onChangeText={(text) => setFormData({ ...formData, name: text })}
-              placeholder="Enter brand name"
-              required
-            />
-            
-            <TextInput
-              label="Description"
-              value={formData.description}
-              onChangeText={(text) => setFormData({ ...formData, description: text })}
-              placeholder="Enter brand description (optional)"
-              multiline
-              numberOfLines={3}
-            />
-            
-            <View style={styles.formActions}>
-              <LoadingButton
-                title="Cancel"
-                onPress={resetForm}
-                variant="outline"
-                style={{ flex: 1 }}
-              />
-              <LoadingButton
-                title={editingBrand ? 'Update' : 'Create'}
-                onPress={handleSubmit}
-                loading={submitting}
-                variant="primary"
-                style={{ flex: 1 }}
-              />
-            </View>
-          </Card>
-        )}
+        <ScreenActionBar
+          title="Brands"
+          primaryActionLabel="Add Brand"
+          onPrimaryAction={() => setShowAddForm(true)}
+          itemCount={brands.length}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+        />
+        <FormModal
+          key={editingBrand?.id ?? 'new-brand'}
+          visible={showAddForm}
+          title={editingBrand ? 'Edit Brand' : 'Add New Brand'}
+          onClose={resetForm}
+        >
+          <FormField
+            label="Name"
+            required
+            value={formData.name}
+            onChangeText={(t) => setFormData({ ...formData, name: t })}
+            placeholder="Enter brand name"
+          />
+          <FormField
+            label="Description"
+            value={formData.description}
+            onChangeText={(t) => setFormData({ ...formData, description: t })}
+            placeholder="Enter description"
+            multiline
+            numberOfLines={3}
+            style={{ height: 80, textAlignVertical: 'top' }}
+          />
+          <ActiveStatusToggle
+            value={formData.isActive}
+            onChange={(v) => setFormData({ ...formData, isActive: v })}
+          />
+          <FormActions
+            submitLabel={editingBrand ? 'Update Brand' : 'Create Brand'}
+            onSubmit={handleSubmit}
+            onCancel={resetForm}
+            onAddMore={editingBrand ? undefined : () => { handleSubmit(); }}
+            loading={submitting}
+          />
+        </FormModal>
 
         <FlatList
           data={loading ? Array(5).fill({}) : brands}
           renderItem={loading ? renderSkeleton : renderBrand}
           keyExtractor={(item, index) => loading ? index.toString() : item.id}
+          contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.primary]} tintColor={theme.primary} />
           }
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
@@ -334,14 +387,6 @@ export const BrandManagementScreen: React.FC<BrandManagementScreenProps> = ({ na
         />
       </View>
 
-      {!showAddForm && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => setShowAddForm(true)}
-        >
-          <Icon name="add" size={24} color={theme.textInverse} />
-        </TouchableOpacity>
-      )}
     </SafeAreaView>
   )
 }

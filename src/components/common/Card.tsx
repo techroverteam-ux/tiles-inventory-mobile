@@ -9,6 +9,7 @@ import {
 } from 'react-native'
 import { useTheme } from '../../context/ThemeContext'
 import { spacing, borderRadius, shadows } from '../../theme'
+import { getCommonStyles } from '../../theme/commonStyles'
 
 interface CardProps extends TouchableOpacityProps {
   children: React.ReactNode
@@ -29,6 +30,7 @@ export const Card: React.FC<CardProps> = ({
   ...props
 }) => {
   const { theme } = useTheme()
+  const commonStyles = getCommonStyles(theme)
 
   const getCardStyles = (): ViewStyle => ({
     backgroundColor: theme.card,
@@ -39,7 +41,7 @@ export const Card: React.FC<CardProps> = ({
     shadowColor: theme.shadow,
   })
 
-  const cardStyles = [getCardStyles(), style]
+  const cardStyles = [commonStyles.glassCard, getCardStyles(), style]
 
   if (touchable) {
     return (

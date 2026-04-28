@@ -1,19 +1,23 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import {
   View,
   Text,
   TouchableOpacity,
   TextInput,
   StyleSheet,
-  StatusBar,
   Modal,
   FlatList,
   ActivityIndicator,
+  Image,
+  Pressable,
+  Animated,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
+import { useSession } from '../../context/SessionContext'
 import { useNavigation, DrawerActions } from '@react-navigation/native'
+import { withOpacity } from '../../utils/colorUtils'
 
 interface SearchResult {
   type: string
@@ -23,7 +27,7 @@ interface SearchResult {
 }
 
 interface MobileHeaderProps {
-  title: string
+  title?: string
   showSearch?: boolean
   showNotifications?: boolean
   showThemeToggle?: boolean
@@ -32,8 +36,14 @@ interface MobileHeaderProps {
   onNotificationPress?: () => void
 }
 
+const quickShortcuts = [
+  { label: 'Products', screen: 'Products' },
+  { label: 'Inventory', screen: 'Inventory' },
+  { label: 'Purchase Orders', screen: 'PurchaseOrders' },
+  { label: 'Sales Orders', screen: 'SalesOrders' },
+]
+
 export const MobileHeader: React.FC<MobileHeaderProps> = ({
-  title,
   showSearch = true,
   showNotifications = true,
   showThemeToggle = true,
@@ -42,36 +52,25 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   onNotificationPress,
 }) => {
   const { theme, isDark, toggleTheme } = useTheme()
-  const navigation = useNavigation()
+  const { user, logout } = useSession()
+  const navigation = useNavigation<any>()
   const insets = useSafeAreaInsets()
-  
+
   const [searchVisible, setSearchVisible] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
+  const [userMenuVisible, setUserMenuVisible] = useState(false)
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query)
-    
-    if (!query.trim() || !onSearchResults) {
-      setSearchResults([])
-      return
-    }
-
+    if (!query.trim() || !onSearchResults) { setSearchResults([]); return }
     setSearchLoading(true)
     try {
       const results = await onSearchResults(query.trim())
       setSearchResults(results)
-    } catch (error) {
-      console.error('Search error:', error)
-      setSearchResults([])
-    } finally {
-      setSearchLoading(false)
-    }
-  }
-
-  const openDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer())
+    } catch { setSearchResults([]) }
+    finally { setSearchLoading(false) }
   }
 
   const closeSearch = () => {
@@ -80,197 +79,278 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     setSearchResults([])
   }
 
-  const renderSearchResult = ({ item }: { item: SearchResult }) => (
-    <TouchableOpacity
-      style={[styles.searchResultItem, { borderBottomColor: theme.border }]}
-      onPress={() => {
-        item.onPress()
-        closeSearch()
-      }}
-      activeOpacity={0.7}
-    >
-      <View style={styles.searchResultContent}>
-        <Text style={[styles.searchResultLabel, { color: theme.text }]}>
-          {item.label}
-        </Text>
-        {item.subtitle && (
-          <Text style={[styles.searchResultSubtitle, { color: theme.mutedForeground }]}>
-            {item.subtitle}
-          </Text>
-        )}
-      </View>
-      <View style={[styles.searchResultType, { backgroundColor: theme.muted }]}>
-        <Text style={[styles.searchResultTypeText, { color: theme.mutedForeground }]}>
-          {item.type}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  )
+  const handleLogout = async () => {
+    setUserMenuVisible(false)
+    await logout()
+  }
+
+  const s = StyleSheet.create({
+    header: {
+      backgroundColor: theme.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+      paddingTop: insets.top,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.08,
+      shadowRadius: 2,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      minHeight: 56,
+      gap: 8,
+    },
+    menuBtn: { padding: 6, borderRadius: 8 },
+    logo: { width: 80, height: 36, resizeMode: 'contain', borderRadius: 8 },
+    spacer: { flex: 1 },
+    rightRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    iconBtn: { padding: 8, borderRadius: 20, position: 'relative' },
+    badge: {
+      position: 'absolute', top: 4, right: 4,
+      minWidth: 18, height: 18, borderRadius: 9,
+      backgroundColor: theme.error,
+      justifyContent: 'center', alignItems: 'center',
+      borderWidth: 1.5, borderColor: theme.surface,
+    },
+    badgeText: { fontSize: 9, fontWeight: '800', color: '#fff' },
+    avatar: {
+      width: 32, height: 32, borderRadius: 16,
+      backgroundColor: theme.primary,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    avatarText: { fontSize: 13, fontWeight: '700', color: theme.primaryForeground },
+    chevron: { marginLeft: 2 },
+
+    // User dropdown
+    userMenuOverlay: { flex: 1 },
+    userMenuCard: {
+      position: 'absolute', top: 0, right: 12,
+      width: 220, borderRadius: 12, borderWidth: 1,
+      borderColor: theme.border, backgroundColor: theme.card,
+      elevation: 8, shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15, shadowRadius: 8,
+      overflow: 'hidden',
+    },
+    userMenuHeader: {
+      padding: 14, borderBottomWidth: 1, borderBottomColor: theme.border,
+    },
+    userMenuName: { fontSize: 14, fontWeight: '700', color: theme.text },
+    userMenuEmail: { fontSize: 12, color: theme.mutedForeground, marginTop: 2 },
+    userMenuItem: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingHorizontal: 14, paddingVertical: 12,
+    },
+    userMenuItemText: { fontSize: 14, color: theme.text },
+    userMenuDivider: { height: 1, backgroundColor: theme.border, marginHorizontal: 14 },
+    userMenuLogout: { color: theme.error },
+
+    // Search modal
+    searchModal: { flex: 1, backgroundColor: theme.background },
+    searchHeader: {
+      backgroundColor: theme.surface,
+      borderBottomWidth: 1, borderBottomColor: theme.border,
+      paddingTop: insets.top, paddingHorizontal: 12, paddingBottom: 10,
+    },
+    searchInputRow: {
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: theme.muted, borderRadius: 10,
+      paddingHorizontal: 10, height: 42,
+    },
+    searchInput: { flex: 1, fontSize: 15, color: theme.text, paddingVertical: 0 },
+    searchMeta: {
+      flexDirection: 'row', justifyContent: 'space-between',
+      alignItems: 'center', marginTop: 8,
+    },
+    searchMetaText: { fontSize: 12, color: theme.mutedForeground },
+    doneBtn: { fontSize: 14, fontWeight: '700', color: theme.text },
+    searchBody: { flex: 1, padding: 14 },
+    searchHint: { fontSize: 13, color: theme.mutedForeground, marginBottom: 14 },
+    shortcutsCard: {
+      borderRadius: 10, borderWidth: 1, borderColor: theme.border,
+      backgroundColor: theme.card, padding: 12,
+    },
+    shortcutsLabel: {
+      fontSize: 10, fontWeight: '700', letterSpacing: 0.8,
+      color: theme.mutedForeground, marginBottom: 10,
+    },
+    shortcutsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    shortcutBtn: {
+      paddingHorizontal: 12, paddingVertical: 8,
+      borderRadius: 6, borderWidth: 1, borderColor: theme.border,
+      backgroundColor: theme.card,
+    },
+    shortcutText: { fontSize: 13, color: theme.text },
+    resultItem: {
+      flexDirection: 'row', alignItems: 'center',
+      paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.border,
+    },
+    resultContent: { flex: 1 },
+    resultLabel: { fontSize: 15, fontWeight: '500', color: theme.text },
+    resultSub: { fontSize: 12, color: theme.mutedForeground, marginTop: 2 },
+    resultType: {
+      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+      backgroundColor: theme.muted,
+    },
+    resultTypeText: { fontSize: 11, color: theme.mutedForeground, fontWeight: '500' },
+  })
+
+  const headerTop = insets.top + 56 + 10
 
   return (
     <>
-      <StatusBar
-        backgroundColor={theme.surface}
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-      />
-      
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: theme.surface,
-            borderBottomColor: theme.border,
-            paddingTop: insets.top,
-          }
-        ]}
-      >
-        <View style={styles.headerContent}>
-          {/* Left Section */}
-          <View style={styles.leftSection}>
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={openDrawer}
-              activeOpacity={0.7}
-            >
-              <Icon name="menu" size={24} color={theme.text} />
-            </TouchableOpacity>
-            
-            <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
-              {title}
-            </Text>
-          </View>
+      <View style={s.header}>
+        <View style={s.headerContent}>
+          {/* Hamburger */}
+          <TouchableOpacity style={s.menuBtn} onPress={() => navigation.dispatch(DrawerActions.openDrawer())} activeOpacity={0.7}>
+            <Icon name="menu" size={24} color={theme.text} />
+          </TouchableOpacity>
 
-          {/* Right Section */}
-          <View style={styles.rightSection}>
+          {/* Logo */}
+          <Image
+            source={require('../../assets/images/hot-logo-cropped.png')}
+            style={s.logo}
+            onError={() => {}}
+          />
+
+          <View style={s.spacer} />
+
+          {/* Right icons */}
+          <View style={s.rightRow}>
             {showSearch && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => setSearchVisible(true)}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity style={s.iconBtn} onPress={() => setSearchVisible(true)} activeOpacity={0.7}>
                 <Icon name="search" size={22} color={theme.text} />
               </TouchableOpacity>
             )}
-
             {showThemeToggle && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={toggleTheme}
-                activeOpacity={0.7}
-              >
-                <Icon 
-                  name={isDark ? 'wb-sunny' : 'nightlight-round'} 
-                  size={22} 
-                  color={theme.text} 
-                />
+              <TouchableOpacity style={s.iconBtn} onPress={toggleTheme} activeOpacity={0.7}>
+                <Icon name={isDark ? 'wb-sunny' : 'nightlight-round'} size={22} color={theme.text} />
               </TouchableOpacity>
             )}
-
             {showNotifications && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={onNotificationPress}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity style={s.iconBtn} onPress={onNotificationPress} activeOpacity={0.7}>
                 <Icon name="notifications" size={22} color={theme.text} />
                 {notificationCount > 0 && (
-                  <View style={[styles.notificationBadge, { backgroundColor: theme.error }]}>
-                    <Text style={[styles.notificationBadgeText, { color: theme.destructiveForeground }]}>
-                      {notificationCount > 99 ? '99+' : notificationCount}
-                    </Text>
+                  <View style={s.badge}>
+                    <Text style={s.badgeText}>{notificationCount > 99 ? '99+' : notificationCount}</Text>
                   </View>
                 )}
               </TouchableOpacity>
             )}
+            {/* User avatar + dropdown */}
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 4 }}
+              onPress={() => setUserMenuVisible(true)}
+              activeOpacity={0.7}
+            >
+              <View style={s.avatar}>
+                <Text style={s.avatarText}>{user?.name?.charAt(0)?.toUpperCase() || 'A'}</Text>
+              </View>
+              <Icon name="keyboard-arrow-down" size={18} color={theme.mutedForeground} style={s.chevron} />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
 
+      {/* User Dropdown Modal */}
+      <Modal visible={userMenuVisible} transparent animationType="fade" onRequestClose={() => setUserMenuVisible(false)}>
+        <Pressable style={s.userMenuOverlay} onPress={() => setUserMenuVisible(false)}>
+          <View style={[s.userMenuCard, { top: headerTop }]}>
+            <View style={s.userMenuHeader}>
+              <Text style={s.userMenuName}>{user?.name || 'Admin User'}</Text>
+              <Text style={s.userMenuEmail}>{user?.email || ''}</Text>
+            </View>
+            <TouchableOpacity style={s.userMenuItem} onPress={() => { setUserMenuVisible(false); toggleTheme() }} activeOpacity={0.7}>
+              <Icon name={isDark ? 'wb-sunny' : 'nightlight-round'} size={18} color={theme.text} />
+              <Text style={s.userMenuItemText}>System Theme</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.userMenuItem} onPress={() => { setUserMenuVisible(false); navigation.navigate('Settings') }} activeOpacity={0.7}>
+              <Icon name="settings" size={18} color={theme.text} />
+              <Text style={s.userMenuItemText}>Settings</Text>
+            </TouchableOpacity>
+            <View style={s.userMenuDivider} />
+            <TouchableOpacity style={s.userMenuItem} onPress={handleLogout} activeOpacity={0.7}>
+              <Icon name="logout" size={18} color={theme.error} />
+              <Text style={[s.userMenuItemText, s.userMenuLogout]}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
       {/* Search Modal */}
-      <Modal
-        visible={searchVisible}
-        animationType="slide"
-        onRequestClose={closeSearch}
-      >
-        <View style={[styles.searchModal, { backgroundColor: theme.background }]}>
-          <StatusBar
-            backgroundColor={theme.background}
-            barStyle={isDark ? 'light-content' : 'dark-content'}
-          />
-          
-          <View
-            style={[
-              styles.searchHeader,
-              {
-                backgroundColor: theme.surface,
-                borderBottomColor: theme.border,
-                paddingTop: insets.top,
-              }
-            ]}
-          >
-            <View style={styles.searchInputContainer}>
-              <Icon name="search" size={20} color={theme.mutedForeground} style={styles.searchIcon} />
+      <Modal visible={searchVisible} animationType="slide" onRequestClose={closeSearch}>
+        <View style={s.searchModal}>
+          <View style={s.searchHeader}>
+            <View style={s.searchInputRow}>
+              <Icon name="search" size={18} color={theme.mutedForeground} style={{ marginRight: 8 }} />
               <TextInput
-                style={[
-                  styles.searchInput,
-                  {
-                    color: theme.text,
-                    backgroundColor: theme.muted,
-                  }
-                ]}
-                placeholder="Search products, brands, orders..."
+                style={s.searchInput}
+                placeholder="Search brands, categories, sizes, products, orders..."
                 placeholderTextColor={theme.mutedForeground}
                 value={searchQuery}
                 onChangeText={handleSearch}
                 autoFocus
-                returnKeyType="search"
               />
-              <TouchableOpacity
-                style={styles.searchCloseButton}
-                onPress={closeSearch}
-                activeOpacity={0.7}
-              >
-                <Icon name="close" size={20} color={theme.text} />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]) }} activeOpacity={0.7}>
+                  <Icon name="close" size={18} color={theme.text} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={s.searchMeta}>
+              <Text style={s.searchMetaText}>Global search</Text>
+              <TouchableOpacity onPress={closeSearch} activeOpacity={0.7}>
+                <Text style={s.doneBtn}>Done</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <View style={styles.searchContent}>
+          <View style={s.searchBody}>
             {searchLoading ? (
-              <View style={styles.searchLoading}>
-                <ActivityIndicator size="large" color={theme.primary} />
-                <Text style={[styles.searchLoadingText, { color: theme.mutedForeground }]}>
-                  Searching...
-                </Text>
-              </View>
-            ) : searchQuery.trim() === '' ? (
-              <View style={styles.searchEmpty}>
-                <Icon name="search" size={48} color={theme.mutedForeground} />
-                <Text style={[styles.searchEmptyText, { color: theme.mutedForeground }]}>
-                  Start typing to search
-                </Text>
-                <Text style={[styles.searchEmptySubtext, { color: theme.mutedForeground }]}>
-                  Search for products, brands, categories, orders, and more
-                </Text>
-              </View>
-            ) : searchResults.length === 0 ? (
-              <View style={styles.searchEmpty}>
-                <Icon name="search-off" size={48} color={theme.mutedForeground} />
-                <Text style={[styles.searchEmptyText, { color: theme.mutedForeground }]}>
-                  No results found
-                </Text>
-                <Text style={[styles.searchEmptySubtext, { color: theme.mutedForeground }]}>
-                  Try different keywords or check spelling
-                </Text>
-              </View>
+              <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
+            ) : searchQuery.trim().length >= 2 ? (
+              searchResults.length === 0 ? (
+                <Text style={s.searchHint}>No results found.</Text>
+              ) : (
+                <FlatList
+                  data={searchResults}
+                  keyExtractor={(_, i) => `${i}`}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity style={s.resultItem} onPress={() => { item.onPress(); closeSearch() }} activeOpacity={0.7}>
+                      <View style={s.resultContent}>
+                        <Text style={s.resultLabel}>{item.label}</Text>
+                        {item.subtitle && <Text style={s.resultSub}>{item.subtitle}</Text>}
+                      </View>
+                      <View style={s.resultType}>
+                        <Text style={s.resultTypeText}>{item.type}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                />
+              )
             ) : (
-              <FlatList
-                data={searchResults}
-                renderItem={renderSearchResult}
-                keyExtractor={(item, index) => `${item.type}-${index}`}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.searchResultsList}
-              />
+              <>
+                <Text style={s.searchHint}>Try searching for products, brands, categories, sizes or orders.</Text>
+                <View style={s.shortcutsCard}>
+                  <Text style={s.shortcutsLabel}>QUICK SHORTCUTS</Text>
+                  <View style={s.shortcutsGrid}>
+                    {quickShortcuts.map(item => (
+                      <TouchableOpacity
+                        key={item.screen}
+                        style={s.shortcutBtn}
+                        onPress={() => { closeSearch(); navigation.navigate(item.screen) }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={s.shortcutText}>{item.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </>
             )}
           </View>
         </View>
@@ -278,149 +358,3 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     </>
   )
 }
-
-const styles = StyleSheet.create({
-  header: {
-    borderBottomWidth: 1,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: 56,
-  },
-  leftSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  menuButton: {
-    padding: 8,
-    marginRight: 8,
-    borderRadius: 20,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    flex: 1,
-  },
-  rightSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionButton: {
-    padding: 8,
-    marginLeft: 4,
-    borderRadius: 20,
-    position: 'relative',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notificationBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  searchModal: {
-    flex: 1,
-  },
-  searchHeader: {
-    borderBottomWidth: 1,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 44,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    paddingVertical: 0,
-  },
-  searchCloseButton: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  searchContent: {
-    flex: 1,
-  },
-  searchLoading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchLoadingText: {
-    marginTop: 16,
-    fontSize: 16,
-  },
-  searchEmpty: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  searchEmptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  searchEmptySubtext: {
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  searchResultsList: {
-    paddingVertical: 8,
-  },
-  searchResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  searchResultContent: {
-    flex: 1,
-  },
-  searchResultLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  searchResultSubtitle: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  searchResultType: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  searchResultTypeText: {
-    fontSize: 12,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-  },
-})

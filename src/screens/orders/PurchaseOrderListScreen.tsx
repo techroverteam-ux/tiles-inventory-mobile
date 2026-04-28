@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -9,9 +9,11 @@ import {
   RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
-import { Header } from '../../components/navigation/Header'
+import { ScreenActionBar } from '../../components/common/ScreenActionBar'
+import { getCommonStyles } from '../../theme/commonStyles'
 import { Card } from '../../components/common/Card'
 import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
@@ -29,13 +31,22 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED'>('ALL')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
+  const commonStyles = getCommonStyles(theme)
 
   useEffect(() => {
     loadOrders()
   }, [])
 
+  useFocusEffect(
+    useCallback(() => {
+      loadOrders()
+    }, [])
+  )
+
   const loadOrders = async () => {
     try {
+      setLoading(true)
       const response = await purchaseOrderService.getPurchaseOrders()
       setOrders(response.purchaseOrders)
     } catch (error) {
@@ -86,80 +97,51 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
   }
 
   const renderOrder = ({ item }: { item: PurchaseOrder }) => (
-    <Card style={styles.orderCard}>
+    <Card style={[commonStyles.glassCard, styles.orderCard]}>
       <TouchableOpacity
         onPress={() => navigation.navigate('PurchaseOrderDetail', { orderId: item.id })}
+        activeOpacity={0.7}
       >
-        <View style={styles.orderHeader}>
-          <View style={styles.orderInfo}>
-            <Text style={[styles.orderNumber, { color: theme.text }]}>
-              {item.orderNumber}
-            </Text>
-            <Text style={[styles.supplierName, { color: theme.textSecondary }]}>
-              {item.supplierName}
-            </Text>
-            <Text style={[styles.orderDate, { color: theme.textSecondary }]}>
-              {new Date(item.orderDate).toLocaleDateString()}
-            </Text>
+        {/* Top right badge */}
+        <View style={styles.badgeContainer}>
+          <View style={[styles.statusBadge, item.status === 'DELIVERED' && { backgroundColor: theme.primary }]}>
+            <Text style={styles.statusBadgeText}>{item.status}</Text>
           </View>
-          <View style={styles.orderStatus}>
-            <View style={[styles.statusBadge, { backgroundColor: withOpacity(getStatusColor(item.status), 0.12) }]}>
-              <Icon 
-                name={getStatusIcon(item.status)} 
-                size={14} 
-                color={getStatusColor(item.status)} 
-              />
-              <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-                {item.status}
-              </Text>
+        </View>
+
+        {/* Center Icon */}
+        <View style={styles.centerIconWrap}>
+          <Icon name="local-shipping" size={48} color={theme.border} />
+        </View>
+
+        {/* Details */}
+        <View style={styles.detailsWrap}>
+          <Text style={styles.metaLabelSmall}>ORDER #</Text>
+          <Text style={styles.orderNumber}>{item.orderNumber}</Text>
+          
+          <View style={styles.gridRow}>
+            <View style={styles.gridCol}>
+              <Text style={styles.metaLabelSmall}>Brand</Text>
+              <Text style={styles.metaValue}>{item.supplierName}</Text>
+            </View>
+            <View style={styles.gridCol}>
+              <Text style={styles.metaLabelSmall}>Amount</Text>
+              <Text style={styles.metaValue}>${item.totalAmount.toFixed(2)}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.gridRow}>
+            <View style={styles.gridCol}>
+              <Text style={styles.metaLabelSmall}>Date</Text>
+              <Text style={styles.metaValue}>{new Date(item.orderDate).toLocaleDateString()}</Text>
+            </View>
+            <View style={styles.gridCol}>
+              <Text style={styles.metaLabelSmall}>Items</Text>
+              <Text style={styles.metaValue}>{item.items.length}</Text>
             </View>
           </View>
         </View>
-        
-        <View style={styles.orderDetails}>
-          <Text style={[styles.orderAmount, { color: theme.text }]}>
-            ${item.totalAmount.toFixed(2)}
-          </Text>
-          <Text style={[styles.itemCount, { color: theme.textSecondary }]}>
-            {item.items.length} items
-          </Text>
-          {item.expectedDelivery && (
-            <Text style={[styles.deliveryDate, { color: theme.textSecondary }]}>
-              Expected: {new Date(item.expectedDelivery).toLocaleDateString()}
-            </Text>
-          )}
-        </View>
 
-        {item.status === 'PENDING' && (
-          <View style={styles.quickActions}>
-            <LoadingButton
-              title="Confirm"
-              onPress={() => handleUpdateStatus(item.id, 'CONFIRMED')}
-              variant="primary"
-              size="small"
-              style={{ flex: 1 }}
-            />
-            <LoadingButton
-              title="Cancel"
-              onPress={() => handleUpdateStatus(item.id, 'CANCELLED')}
-              variant="outline"
-              size="small"
-              style={{ flex: 1 }}
-            />
-          </View>
-        )}
-
-        {item.status === 'CONFIRMED' && (
-          <View style={styles.quickActions}>
-            <LoadingButton
-              title="Mark Delivered"
-              onPress={() => navigation.navigate('PurchaseOrderDeliver', { orderId: item.id })}
-              variant="primary"
-              size="small"
-              fullWidth
-            />
-          </View>
-        )}
       </TouchableOpacity>
     </Card>
   )
@@ -217,82 +199,76 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
       fontWeight: typography.fontWeight.medium,
     },
     orderCard: {
-      marginBottom: spacing.base,
+      marginBottom: spacing.md,
+      padding: 0,
+      borderRadius: 16,
+      overflow: 'hidden',
     },
-    orderHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: spacing.sm,
-    },
-    orderInfo: {
-      flex: 1,
-    },
-    orderNumber: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      marginBottom: spacing.xs,
-    },
-    supplierName: {
-      fontSize: typography.fontSize.sm,
-      marginBottom: spacing.xs,
-    },
-    orderDate: {
-      fontSize: typography.fontSize.xs,
-    },
-    orderStatus: {
+    badgeContainer: {
       alignItems: 'flex-end',
+      padding: 16,
     },
     statusBadge: {
-      flexDirection: 'row',
+      backgroundColor: theme.info,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 16,
+    },
+    statusBadgeText: {
+      color: '#fff',
+      fontSize: 10,
+      fontWeight: 'bold',
+      letterSpacing: 1,
+    },
+    centerIconWrap: {
       alignItems: 'center',
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-      borderRadius: 12,
-      gap: spacing.xs,
+      paddingVertical: 20,
     },
-    statusText: {
-      fontSize: typography.fontSize.xs,
-      fontWeight: typography.fontWeight.medium,
+    detailsWrap: {
+      paddingHorizontal: 20,
+      paddingBottom: 20,
     },
-    orderDetails: {
-      borderTopWidth: 1,
-      borderTopColor: theme.border,
-      paddingTop: spacing.sm,
-      marginBottom: spacing.sm,
+    orderNumber: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 20,
     },
-    orderAmount: {
-      fontSize: typography.fontSize.lg,
-      fontWeight: typography.fontWeight.bold,
-      marginBottom: spacing.xs,
+    metaLabelSmall: {
+      fontSize: 10,
+      color: theme.mutedForeground,
+      fontWeight: 'bold',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 4,
     },
-    itemCount: {
-      fontSize: typography.fontSize.sm,
-      marginBottom: spacing.xs,
-    },
-    deliveryDate: {
-      fontSize: typography.fontSize.sm,
-    },
-    quickActions: {
+    gridRow: {
       flexDirection: 'row',
-      gap: spacing.sm,
-      marginTop: spacing.sm,
+      marginBottom: 16,
+    },
+    gridCol: {
+      flex: 1,
+    },
+    metaValue: {
+      color: theme.text,
+      fontWeight: '700',
+      fontSize: 14,
     },
     fab: {
       position: 'absolute',
       right: spacing.base,
-      bottom: spacing.base,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      bottom: 24, // adjusted for tab bar
+      width: 64,
+      height: 64,
+      borderRadius: 32,
       backgroundColor: theme.primary,
       alignItems: 'center',
       justifyContent: 'center',
       elevation: 8,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
     },
     emptyContainer: {
       flex: 1,
@@ -309,21 +285,17 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
   })
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header
+    <SafeAreaView style={styles.container} edges={['right', 'left']}>
+      <ScreenActionBar
         title="Purchase Orders"
-        showBack
-        onBackPress={() => navigation.goBack()}
+        primaryActionLabel="New Order"
+        onPrimaryAction={() => navigation.navigate('PurchaseOrderForm')}
+        itemCount={filteredOrders.length}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
       />
       
       <View style={styles.content}>
-        <View style={styles.filterContainer}>
-          <FilterButton status="ALL" title="All" />
-          <FilterButton status="PENDING" title="Pending" />
-          <FilterButton status="CONFIRMED" title="Confirmed" />
-          <FilterButton status="DELIVERED" title="Delivered" />
-        </View>
-
         <FlatList
           data={loading ? Array(5).fill({}) : filteredOrders}
           renderItem={loading ? renderSkeleton : renderOrder}

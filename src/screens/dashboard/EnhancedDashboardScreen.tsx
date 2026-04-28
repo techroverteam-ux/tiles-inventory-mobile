@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -7,317 +7,426 @@ import {
   RefreshControl,
   StyleSheet,
   Dimensions,
-  Alert,
+  ActivityIndicator,
 } from 'react-native'
-import Icon from 'react-native-vector-icons/MaterialIcons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import * as LucideIcons from 'lucide-react-native'
 import { useTheme } from '../../context/ThemeContext'
-import { useSession } from '../../context/SessionContext'
 import { useNavigation } from '@react-navigation/native'
-import { MobileHeader } from '../../components/common/MobileHeader'
+import { MainHeader } from '../../components/navigation/MainHeader'
 import { QuickAddPanel } from '../../components/common/QuickAddPanel'
+import { DashboardCard } from '../../components/dashboard/DashboardCard'
+import { getCommonStyles } from '../../theme/commonStyles'
 import { withOpacity } from '../../utils/colorUtils'
+import { apiClient } from '../../services/api/ApiClient'
+
+import { useToast } from '../../context/ToastContext'
 
 const { width: screenWidth } = Dimensions.get('window')
+const CARD_WIDTH = (screenWidth - 44) / 2
 
 interface DashboardStats {
-  totalProducts: number
-  totalInventory: number
-  lowStockItems: number
-  totalOrders: number
-  totalSales: number
-  totalPurchases: number
-  activeLocations: number
-  activeBrands: number
+  totalBrands: number
   totalCategories: number
   totalSizes: number
+  totalProducts: number
+  purchaseOrders: number
+  salesOrders: number
+  lowStockItems: number
+  monthlySales: number
 }
 
-interface RecentActivity {
-  id: string
-  type: 'product' | 'order' | 'inventory' | 'movement'
-  title: string
-  subtitle: string
-  timestamp: string
-  icon: string
-  color: string
+interface ChartBar {
+  month: string
+  sales: number
+  purchases: number
 }
+
+interface RecentOrder {
+  id: string
+  type: 'Sales' | 'Purchase'
+  customer?: string
+  brand?: string
+  amount: number
+  status: string
+}
+
+const statCards = [
+  { key: 'totalBrands', title: 'BRANDS', subtitle: 'Active Partners', icon: 'Users', screen: 'BrandManagement', iconBg: true },
+  { key: 'totalCategories', title: 'CATEGORIES', subtitle: 'Types of products', icon: 'Palette', screen: 'CategoryManagement' },
+  { key: 'totalSizes', title: 'SIZES', subtitle: 'Variations available', icon: 'Ruler', screen: 'SizeManagement' },
+  { key: 'totalProducts', title: 'PRODUCTS', subtitle: 'Total items in catalog', icon: 'Package', screen: 'Tabs', params: { screen: 'ProductsTab' } },
+  { key: 'totalProducts', title: 'INVENTORY', subtitle: 'In-stock units', icon: 'Package', screen: 'Tabs', params: { screen: 'InventoryTab' }, iconBg: true },
+  { key: 'purchaseOrders', title: 'PURCHASE ORDERS', subtitle: 'Incoming stock orders', icon: 'ShoppingCart', screen: 'Tabs', params: { screen: 'PurchaseTab' } },
+  { key: 'salesOrders', title: 'SALES ORDERS', subtitle: 'Total transactions', icon: 'TrendingUp', screen: 'Tabs', params: { screen: 'SalesTab' } },
+  { key: 'lowStockItems', title: 'LOW STOCK', subtitle: 'Items need attention', icon: 'AlertTriangle', screen: 'Tabs', params: { screen: 'InventoryTab' }, isAlert: true, iconBg: true },
+]
+
+const CHART_HEIGHT = 160
+const CHART_MAX_BARS = 6
 
 export const EnhancedDashboardScreen: React.FC = () => {
   const { theme } = useTheme()
-  const { user } = useSession()
+  const commonStyles = getCommonStyles(theme)
   const navigation = useNavigation<any>()
+  const { showInfo } = useToast()
+  const insets = useSafeAreaInsets()
   const [refreshing, setRefreshing] = useState(false)
-  const [stats, setStats] = useState<DashboardStats>({
-    totalProducts: 0,
-    totalInventory: 0,
-    lowStockItems: 0,
-    totalOrders: 0,
-    totalSales: 0,
-    totalPurchases: 0,
-    activeLocations: 0,
-    activeBrands: 0,
-    totalCategories: 0,
-    totalSizes: 0,
-  })
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<DashboardStats>({
+    totalBrands: 0, totalCategories: 0, totalSizes: 0, totalProducts: 0,
+    purchaseOrders: 0, salesOrders: 0, lowStockItems: 0, monthlySales: 0,
+  })
+  const [chartData, setChartData] = useState<ChartBar[]>([])
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
+  const [notificationCount, setNotificationCount] = useState(0)
 
-  const fetchDashboardData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      setLoading(true)
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 800))
-      setStats({
-        totalProducts: 1247,
-        totalInventory: 15680,
-        lowStockItems: 23,
-        totalOrders: 89,
-        totalSales: 156780,
-        totalPurchases: 89450,
-        activeLocations: 8,
-        activeBrands: 10,
-        totalCategories: 8,
-        totalSizes: 12,
-      })
-      setRecentActivity([
-        {
-          id: '1',
-          type: 'product',
-          title: 'New Product Added',
-          subtitle: 'Ceramic Floor Tile 24x24',
-          timestamp: '2 hours ago',
-          icon: 'add-box',
-          color: theme.primary,
-        },
-        {
-          id: '2',
-          type: 'order',
-          title: 'Purchase Order Created',
-          subtitle: 'PO-2026-001 - ₹45,000',
-          timestamp: '4 hours ago',
-          icon: 'shopping-cart',
-          color: theme.success,
-        },
-        {
-          id: '3',
-          type: 'inventory',
-          title: 'Low Stock Alert',
-          subtitle: 'Marble Tiles - Only 5 boxes left',
-          timestamp: '6 hours ago',
-          icon: 'warning',
-          color: theme.warning,
-        },
-        {
-          id: '4',
-          type: 'movement',
-          title: 'Stock Movement',
-          subtitle: 'Transferred 50 boxes to Warehouse B',
-          timestamp: '1 day ago',
-          icon: 'swap-horiz',
-          color: theme.info,
-        },
+      const [statsRes, salesRes, ordersRes, notifRes] = await Promise.allSettled([
+        apiClient.get('/dashboard/stats'),
+        apiClient.get('/dashboard/sales-data'),
+        apiClient.get('/dashboard/recent-orders'),
+        apiClient.get('/notifications?page=1&limit=1'),
       ])
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load dashboard data')
-    } finally {
-      setLoading(false)
-    }
-  }
+      if (statsRes.status === 'fulfilled') setStats(statsRes.value.data)
+      if (salesRes.status === 'fulfilled') setChartData((salesRes.value.data || []).slice(-CHART_MAX_BARS))
+      if (ordersRes.status === 'fulfilled') setRecentOrders(ordersRes.value.data || [])
+      if (notifRes.status === 'fulfilled') {
+        const notifData = notifRes.value.data
+        const unread = (notifData?.notifications || []).filter((n: any) => !n.isRead && !n.read).length
+        setNotificationCount(notifData?.total ? Math.min(notifData.total, 99) : unread)
+      }
+    } catch {}
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
 
   const onRefresh = async () => {
     setRefreshing(true)
-    await fetchDashboardData()
+    await fetchData()
     setRefreshing(false)
   }
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
+  const s = StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    scroll: { flex: 1 },
+    scrollContent: { paddingBottom: 140 },
 
-  const handleSearch = async (query: string) => {
-    return [
-      {
-        type: 'Product',
-        label: `Ceramic Tile ${query}`,
-        subtitle: 'Floor Tile - 24x24',
-        onPress: () => navigation.navigate('Products'),
-      },
-    ]
+    // Header row: Dashboard title + Generate Report
+    headerRow: {
+      marginHorizontal: 16,
+      marginTop: 16,
+      marginBottom: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    dashboardTitle: {
+      fontSize: 28,
+      fontWeight: '900',
+      color: theme.primary,
+      letterSpacing: -0.5,
+    },
+    generateBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: 'rgba(255,255,255,0.03)',
+    },
+    generateBtnText: { fontSize: 12, fontWeight: '700', color: theme.text },
+
+    // Stats grid
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 16, marginBottom: 16 },
+    card: {
+      width: (screenWidth - 44) / 2, // 16 * 2 (padding) + 12 (gap) = 44
+    },
+    cardIconWrap: {
+      width: 40, height: 40, borderRadius: 20,
+      alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+    },
+    cardTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, color: theme.mutedForeground, marginBottom: 4 },
+    cardValueRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap' },
+    cardValue: { fontSize: 24, fontWeight: '800', color: theme.text },
+    cardSubtitle: { fontSize: 12, color: theme.mutedForeground, marginLeft: 4 },
+    cardArrow: { position: 'absolute', top: 14, right: 14 },
+
+    // Chart section
+    chartCard: {
+      marginHorizontal: 16, marginBottom: 16,
+      padding: 20, borderRadius: 24, borderWidth: 1,
+      borderColor: theme.border, backgroundColor: theme.card,
+    },
+    chartHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+    chartIconWrap: {
+      width: 36, height: 36, borderRadius: 10,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: withOpacity(theme.primary, 0.12),
+    },
+    chartTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
+    chartAreaContainer: { position: 'relative' },
+    chartArea: { height: CHART_HEIGHT, flexDirection: 'row', alignItems: 'flex-end', marginLeft: 40 },
+    chartBarsContainer: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+    chartBarGroup: { flex: 1, alignItems: 'center', gap: 2, zIndex: 10 },
+    chartBarSales: { width: '35%', borderRadius: 3, backgroundColor: theme.primary },
+    chartBarPurchases: { width: '35%', borderRadius: 3, backgroundColor: withOpacity(theme.primary, 0.35) },
+    chartBarsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, flex: 1 },
+    chartLabel: { fontSize: 9, color: theme.mutedForeground, marginTop: 4, textAlign: 'center' },
+    chartYAxis: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 40, justifyContent: 'space-between', alignItems: 'flex-end', paddingRight: 6 },
+    chartYLabel: { fontSize: 9, color: theme.mutedForeground, marginTop: -6 },
+    chartGridLines: { position: 'absolute', left: 40, right: 0, top: 0, bottom: 0, justifyContent: 'space-between' },
+    chartGridLine: { height: 1, borderTopWidth: 1, borderTopColor: withOpacity(theme.border, 0.5), borderStyle: 'dashed' },
+
+    // Transactions
+    transCard: {
+      marginHorizontal: 16, marginBottom: 24,
+      borderRadius: 24, borderWidth: 1,
+      borderColor: theme.border, backgroundColor: theme.card, overflow: 'hidden',
+    },
+    transHeader: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      padding: 16, borderBottomWidth: 1, borderBottomColor: theme.border,
+    },
+    transHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    transIconWrap: {
+      width: 36, height: 36, borderRadius: 10,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: withOpacity(theme.info || theme.primary, 0.12),
+    },
+    transTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
+    exploreBtn: { fontSize: 11, fontWeight: '700', color: theme.mutedForeground, letterSpacing: 0.5 },
+    transItem: {
+      flexDirection: 'row', alignItems: 'center',
+      paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: withOpacity(theme.border, 0.5),
+    },
+    transItemIcon: {
+      width: 36, height: 36, borderRadius: 10,
+      alignItems: 'center', justifyContent: 'center', marginRight: 12,
+    },
+    transItemContent: { flex: 1 },
+    transItemRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+    transItemId: { fontSize: 13, fontWeight: '700', color: theme.text },
+    transTypeBadge: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+      backgroundColor: theme.card, // Fallback if no specific logic
+    },
+    transTypeBadgeText: { fontSize: 9, fontWeight: '800', color: '#fff' },
+    transItemSub: { fontSize: 11, color: theme.mutedForeground },
+    transItemRight: { alignItems: 'flex-end' },
+    transAmount: { fontSize: 14, fontWeight: '800', color: theme.text, marginBottom: 4 },
+    statusBadge: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+    },
+    statusText: { fontSize: 9, fontWeight: '800' },
+  })
+
+  const getChartMax = () => {
+    if (!chartData.length) return 1
+    return Math.max(...chartData.flatMap(d => [d.sales, d.purchases]), 1)
   }
 
-  // Stat cards matching web version
-  const statCards = [
-    { title: 'BRANDS', value: stats.activeBrands, subtitle: 'Active Partners', icon: 'people', screen: 'BrandManagement' },
-    { title: 'CATEGORIES', value: stats.totalCategories, subtitle: 'Types of products', icon: 'palette', screen: 'CategoryManagement' },
-    { title: 'SIZES', value: stats.totalSizes, subtitle: 'Variations available', icon: 'straighten', screen: 'SizeManagement' },
-    { title: 'PRODUCTS', value: stats.totalProducts, subtitle: 'Total items in catalog', icon: 'inventory-2', screen: 'Products' },
-    { title: 'INVENTORY', value: stats.totalInventory, subtitle: 'In-stock units', icon: 'layers', screen: 'Inventory' },
-    { title: 'PURCHASE ORDERS', value: stats.totalOrders, subtitle: 'Incoming stock orders', icon: 'shopping-cart', screen: 'PurchaseOrders' },
-    { title: 'SALES ORDERS', value: stats.totalSales > 0 ? Math.floor(stats.totalSales / 1000) : 0, subtitle: 'Total transactions', icon: 'trending-up', screen: 'SalesOrders' },
-    { title: 'LOW STOCK', value: stats.lowStockItems, subtitle: 'Items need attention', icon: 'warning', screen: 'Inventory' },
-  ]
+  const renderChart = () => {
+    if (!chartData.length) return null
+    const max = getChartMax()
+    const maxRounded = Math.ceil(max / 10000) * 10000 || 40000 // Force nice round numbers
+    const yLabels = [maxRounded, Math.round(maxRounded * 0.75), Math.round(maxRounded * 0.5), Math.round(maxRounded * 0.25), 0]
 
-  const StatCard: React.FC<{
-    title: string
-    value: string | number
-    subtitle: string
-    icon: string
-    screen: string
-  }> = ({ title, value, subtitle, icon, screen }) => (
-    <TouchableOpacity
-      style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-      onPress={() => navigation.navigate(screen)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.statIconWrap, { backgroundColor: withOpacity(theme.primary, 0.12) }]}>
-        <Icon name={icon} size={22} color={theme.primary} />
+    return (
+      <View style={[commonStyles.glassCard, s.chartCard]}>
+        <View style={s.chartHeader}>
+          <View style={s.chartIconWrap}>
+            <LucideIcons.TrendingUp size={18} color={theme.primary} strokeWidth={2.5} />
+          </View>
+          <Text style={s.chartTitle}>Financial Performance Over Time</Text>
+        </View>
+        <View style={s.chartAreaContainer}>
+          <View style={s.chartGridLines}>
+            {yLabels.map((_, i) => <View key={i} style={s.chartGridLine} />)}
+          </View>
+          <View style={s.chartYAxis}>
+            {yLabels.map((v, i) => (
+              <Text key={i} style={s.chartYLabel}>{v}</Text>
+            ))}
+          </View>
+          <View style={s.chartArea}>
+            {chartData.map((d, i) => {
+              const salesH = Math.max((d.sales / maxRounded) * CHART_HEIGHT, 2)
+              const purchH = Math.max((d.purchases / maxRounded) * CHART_HEIGHT, 2)
+              return (
+                <View key={i} style={s.chartBarGroup}>
+                  <View style={s.chartBarsRow}>
+                    <View style={[s.chartBarSales, { height: salesH }]} />
+                    <View style={[s.chartBarPurchases, { height: purchH }]} />
+                  </View>
+                </View>
+              )
+            })}
+          </View>
+          <View style={{ flexDirection: 'row', marginLeft: 40 }}>
+            {chartData.map((d, i) => (
+              <View key={i} style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={s.chartLabel}>{d.month}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
       </View>
-      <Text style={[styles.statCardTitle, { color: theme.mutedForeground }]}>{title}</Text>
-      <View style={styles.statValueRow}>
-        <Text style={[styles.statValue, { color: theme.primary }]}>{value}</Text>
-        <Text style={[styles.statSubtitle, { color: theme.mutedForeground }]}> {subtitle}</Text>
-      </View>
-    </TouchableOpacity>
-  )
+    )
+  }
 
-  const ActivityItem: React.FC<{ activity: RecentActivity }> = ({ activity }) => (
-    <TouchableOpacity
-      style={[styles.activityItem, { backgroundColor: theme.card, borderColor: theme.border }]}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.activityIcon, { backgroundColor: withOpacity(activity.color, 0.12) }]}>
-        <Icon name={activity.icon} size={20} color={activity.color} />
+  if (loading) {
+    return (
+      <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
-      <View style={styles.activityContent}>
-        <Text style={[styles.activityTitle, { color: theme.text }]}>{activity.title}</Text>
-        <Text style={[styles.activitySubtitle, { color: theme.mutedForeground }]}>{activity.subtitle}</Text>
-      </View>
-      <Text style={[styles.activityTime, { color: theme.mutedForeground }]}>{activity.timestamp}</Text>
-    </TouchableOpacity>
-  )
+    )
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <MobileHeader
-        title="Dashboard"
-        onSearchResults={handleSearch}
-        notificationCount={3}
-        onNotificationPress={() => navigation.navigate('Notifications')}
-      />
-
+    <View style={s.container}>
+      <MainHeader />
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} tintColor={theme.primary} />
-        }
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} tintColor={theme.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Welcome */}
-        <View style={[styles.welcomeSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View>
-            <Text style={[styles.welcomeTitle, { color: theme.text }]}>
-              Welcome back, {user?.name || 'User'}!
-            </Text>
-            <Text style={[styles.welcomeSubtitle, { color: theme.mutedForeground }]}>
-              Here's what's happening with your inventory today.
-            </Text>
-          </View>
+        {/* Dashboard header row */}
+        <View style={s.headerRow}>
+          <Text style={s.dashboardTitle}>Dashboard</Text>
+          <TouchableOpacity 
+            style={s.generateBtn} 
+            activeOpacity={0.7}
+            onPress={() => showInfo('Web Feature', 'PDF generation is handled on the web portal')}
+          >
+            <LucideIcons.Download size={16} color={theme.text} strokeWidth={2.5} />
+            <Text style={s.generateBtnText}>Generate Report</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Stats Grid */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Overview</Text>
-          <View style={styles.statsGrid}>
-            {statCards.map(card => (
-              <StatCard key={card.title} {...card} />
-            ))}
-          </View>
+        <View style={s.grid}>
+          {statCards.map((card, idx) => {
+            const value = stats[card.key as keyof DashboardStats] ?? 0
+            const isAlert = card.isAlert && value > 0
+            const iconColor = isAlert ? theme.error : theme.primary
+            const iconBgColor = isAlert
+              ? withOpacity(theme.error, 0.15)
+              : card.iconBg
+              ? withOpacity(theme.primary, 0.2)
+              : withOpacity(theme.primary, 0.1)
+
+            let cardColor: 'primary' | 'success' | 'warning' | 'destructive' | 'info' = 'primary'
+            if (isAlert) cardColor = 'destructive'
+            else if (card.key === 'salesOrders' || card.key === 'totalProducts') cardColor = 'success'
+            else if (card.key === 'totalCategories' || card.key === 'purchaseOrders') cardColor = 'info'
+            else if (card.key === 'totalSizes') cardColor = 'warning'
+
+            return (
+              <DashboardCard
+                key={idx}
+                title={card.title}
+                value={value}
+                subtitle={card.subtitle}
+                icon={card.icon}
+                onPress={() => card.params ? navigation.navigate(card.screen, card.params) : navigation.navigate(card.screen)}
+                color={cardColor}
+                style={s.card}
+                hasIconBg={card.iconBg}
+              />
+            )
+          })}
         </View>
 
-        {/* Recent Activity */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Activity</Text>
-            <TouchableOpacity activeOpacity={0.7}>
-              <Text style={[styles.sectionAction, { color: theme.primary }]}>View All</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.activityList}>
-            {recentActivity.map(activity => (
-              <ActivityItem key={activity.id} activity={activity} />
-            ))}
-          </View>
-        </View>
+        {/* Financial Chart */}
+        {renderChart()}
 
-        <View style={styles.bottomSpacing} />
+        {/* Latest Transactions */}
+        {recentOrders.length > 0 && (
+          <View style={[commonStyles.glassCard, s.transCard]}>
+            <View style={s.transHeader}>
+              <View style={s.transHeaderLeft}>
+                <View style={s.transIconWrap}>
+                  <LucideIcons.ShoppingCart size={18} color={theme.info || theme.primary} strokeWidth={2.5} />
+                </View>
+                <Text style={s.transTitle}>Latest Transactions</Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('SalesOrders')} activeOpacity={0.7}>
+                <Text style={s.exploreBtn}>EXPLORE HISTORY</Text>
+              </TouchableOpacity>
+            </View>
+            {recentOrders.map((order, idx) => {
+              const isSales = order.type === 'Sales'
+              const iconColor = isSales ? theme.success : (theme.info || theme.primary)
+              const badgeBg = isSales ? withOpacity(theme.mutedForeground, 0.25) : withOpacity(theme.mutedForeground, 0.25)
+              
+              const isDelivered = (order.status || '').toUpperCase() === 'DELIVERED'
+              const statusBg = isDelivered ? withOpacity(theme.mutedForeground, 0.3) : withOpacity(theme.mutedForeground, 0.1)
+              const statusColor = isDelivered ? '#cbd5e1' : theme.mutedForeground
+
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  style={[s.transItem, idx === recentOrders.length - 1 && { borderBottomWidth: 0 }]}
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate(isSales ? 'SalesOrders' : 'PurchaseOrders')}
+                >
+                  <View style={[s.transItemIcon, { backgroundColor: withOpacity(iconColor, 0.12) }]}>
+                    {isSales ? <LucideIcons.TrendingUp size={18} color={iconColor} /> : <LucideIcons.ShoppingCart size={18} color={iconColor} />}
+                  </View>
+                  <View style={s.transItemContent}>
+                    <View style={s.transItemRow}>
+                      <Text style={s.transItemId} numberOfLines={1}>{order.id}</Text>
+                      <View style={[s.transTypeBadge, { backgroundColor: badgeBg }]}>
+                        <Text style={s.transTypeBadgeText}>{order.type.toUpperCase()}</Text>
+                      </View>
+                    </View>
+                    <Text style={s.transItemSub} numberOfLines={1}>
+                      {isSales ? (order.customer || 'Customer') : (order.brand || 'Supplier')}
+                    </Text>
+                  </View>
+                  <View style={s.transItemRight}>
+                    <Text style={s.transAmount}>₹{Number(order.amount).toLocaleString()}</Text>
+                    <View style={[s.statusBadge, { backgroundColor: statusBg }]}>
+                      <Text style={[s.statusText, { color: statusColor }]}>{(order.status || '').toUpperCase()}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        )}
       </ScrollView>
 
-      {/* Quick Add FAB */}
-      <QuickAddPanel navigation={navigation} />
+      <TouchableOpacity 
+        style={{
+          position: 'absolute',
+          right: 24,
+          bottom: 24 + insets.bottom,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: '#60a5fa',
+          alignItems: 'center',
+          justifyContent: 'center',
+          elevation: 5,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 6,
+        }}
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('ProductForm')}
+      >
+        <LucideIcons.Plus size={24} color="#0f172a" strokeWidth={3} />
+      </TouchableOpacity>
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 160 },
-  welcomeSection: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  welcomeTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4 },
-  welcomeSubtitle: { fontSize: 14, lineHeight: 20 },
-  section: { marginHorizontal: 16, marginBottom: 24 },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
-  sectionAction: { fontSize: 14, fontWeight: '500' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  statCard: {
-    width: (screenWidth - 44) / 2,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
-  },
-  statIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  statCardTitle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
-  statValueRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap' },
-  statValue: { fontSize: 22, fontWeight: '700' },
-  statSubtitle: { fontSize: 12 },
-  activityList: { gap: 8 },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  activityIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  activityContent: { flex: 1 },
-  activityTitle: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
-  activitySubtitle: { fontSize: 12 },
-  activityTime: { fontSize: 12 },
-  bottomSpacing: { height: 20 },
-})
