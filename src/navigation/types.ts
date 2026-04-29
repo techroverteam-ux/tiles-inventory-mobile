@@ -54,7 +54,6 @@ export type MainStackParamList = {
   CollectionManagement: undefined
   SizeManagement: undefined
   LocationManagement: undefined
-  Customers: undefined
   Notifications: undefined
   GlobalSearch: undefined
   EnquiryForm: { productId?: string; productName?: string }
@@ -70,7 +69,6 @@ export type DrawerParamList = {
   CollectionManagement: undefined
   SizeManagement: undefined
   LocationManagement: undefined
-  Customers: undefined
   Notifications: undefined
   GlobalSearch: undefined
   Reports: undefined
@@ -108,13 +106,6 @@ export type ProductsStackParamList = {
   ProductDetail: { productId: string }
   BrandDetail: { brandId: string }
   CategoryDetail: { categoryId: string }
-}
-
-// Customers Stack Params
-export type CustomersStackParamList = {
-  CustomerList: undefined
-  CustomerDetail: { customerId: string }
-  CustomerForm: { customer?: any }
 }
 
 // Settings Stack Params
@@ -170,4 +161,3 @@ export type SettingsNavigationProp = CompositeNavigationProp<
 // Route Props
 export type ProductDetailRouteProp = RouteProp<InventoryStackParamList, 'InventoryDetail'>
 export type OrderDetailRouteProp = RouteProp<OrdersStackParamList, 'OrderDetail'>
-export type CustomerDetailRouteProp = RouteProp<CustomersStackParamList, 'CustomerDetail'>

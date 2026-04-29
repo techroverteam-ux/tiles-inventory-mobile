@@ -1111,56 +1111,6 @@ export const inventoryService = {
   },
 }
 
-export interface Customer {
-  id: string
-  name: string
-  email?: string
-  phone?: string
-  address?: string
-  createdAt?: string
-  updatedAt?: string
-}
-
-export interface CustomerResponse {
-  customers: Customer[]
-  total: number
-}
-
-export const customerService = {
-  getCustomers: async (page = 1, limit = 20): Promise<CustomerResponse> => {
-    try {
-      const response = await apiClient.get('/admin/customers', { params: { page, pageSize: limit } })
-      const data = response.data
-      return {
-        customers: data.customers || [],
-        total: data.pagination?.total || 0,
-      }
-    } catch (error) {
-      console.error('Failed to fetch customers:', error)
-      return { customers: [], total: 0 }
-    }
-  },
-
-  getCustomer: async (id: string): Promise<Customer> => {
-    const response = await apiClient.get(`/admin/customers/${id}`)
-    return response.data
-  },
-
-  createCustomer: async (data: Partial<Customer>): Promise<Customer> => {
-    const response = await apiClient.post('/admin/customers', data)
-    return response.data
-  },
-
-  updateCustomer: async (id: string, data: Partial<Customer>): Promise<Customer> => {
-    const response = await apiClient.put(`/admin/customers/${id}`, data)
-    return response.data
-  },
-
-  deleteCustomer: async (id: string): Promise<void> => {
-    await apiClient.delete(`/admin/customers/${id}`)
-  },
-}
-
 export const enquiryService = {
   submitEnquiry: async (data: EnquiryRequest): Promise<{ success: boolean }> => {
     try {
