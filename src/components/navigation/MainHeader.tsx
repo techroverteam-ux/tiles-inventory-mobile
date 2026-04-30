@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { View, Image, TouchableOpacity, StyleSheet, Text } from 'react-native'
+import { View, Image, TouchableOpacity, StyleSheet, Text, Modal, Pressable } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { DrawerActions, useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../../context/ThemeContext'
 import { useSession } from '../../context/SessionContext'
+import { useToast } from '../../context/ToastContext'
 import { apiClient } from '../../services/api/ApiClient'
 import { MainStackParamList } from '../../navigation/types'
 
@@ -12,8 +13,11 @@ export const MainHeader: React.FC = () => {
   const { theme, isDark, toggleTheme } = useTheme()
   const { user } = useSession()
   const navigation = useNavigation<NavigationProp<MainStackParamList>>()
+  const { logout } = useSession()
+  const { showWarning } = useToast()
   const insets = useSafeAreaInsets()
   const [unreadCount, setUnreadCount] = useState(0)
+  const [showProfile, setShowProfile] = useState(false)
 
   const fetchUnread = useCallback(async () => {
     try {
@@ -97,9 +101,32 @@ export const MainHeader: React.FC = () => {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.avatar} onPress={() => navigation.navigate('GlobalSearch')}>
+        <TouchableOpacity style={styles.avatar} onPress={() => setShowProfile(true)}>
           <Text style={styles.avatarText}>{initials}</Text>
         </TouchableOpacity>
+
+        <Modal visible={showProfile} transparent animationType="fade" onRequestClose={() => setShowProfile(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} onPress={() => setShowProfile(false)}>
+            <View style={{ position: 'absolute', top: insets.top + 56, right: 16 }}>
+              <View style={{ width: 220, backgroundColor: theme.surface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: theme.border }}>
+                <Text style={{ color: theme.text, fontWeight: '700', marginBottom: 8 }}>{user?.name || 'Admin User'}</Text>
+                <Text style={{ color: theme.mutedForeground, fontSize: 12, marginBottom: 8 }}>{user?.email}</Text>
+
+                <TouchableOpacity style={{ paddingVertical: 8 }} onPress={() => { toggleTheme(); setShowProfile(false) }}>
+                  <Text style={{ color: theme.text }}>System Theme</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={{ paddingVertical: 8 }} onPress={() => { setShowProfile(false); navigation.navigate('Settings') }}>
+                  <Text style={{ color: theme.text }}>Settings</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={{ paddingVertical: 8 }} onPress={() => { setShowProfile(false); showWarning('Logout', 'Sign out of your account?', { action: { label: 'Logout', onPress: () => logout() } }) }}>
+                  <Text style={{ color: theme.error }}>Logout</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
       </View>
     </View>
   )

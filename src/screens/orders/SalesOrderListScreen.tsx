@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   RefreshControl,
   ScrollView,
 } from 'react-native'
@@ -16,6 +15,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
 import { MainHeader } from '../../components/navigation/MainHeader'
 import { ScreenActionBar } from '../../components/common/ScreenActionBar'
+import { PaginationControl } from '../../components/common/PaginationControl'
 import { getCommonStyles } from '../../theme/commonStyles'
 import { Card } from '../../components/common/Card'
 import { LoadingButton } from '../../components/common/LoadingButton'
@@ -31,31 +31,39 @@ interface SalesOrderListScreenProps {
 
 export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navigation }) => {
   const { theme } = useTheme()
-  const { showSuccess } = useToast()
+  const { showSuccess, showError, showWarning } = useToast()
   const [orders, setOrders] = useState<SalesOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<'ALL' | 'DRAFT' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED'>('ALL')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
   const commonStyles = getCommonStyles(theme)
 
   useEffect(() => {
-    loadOrders()
+    loadOrders(1)
   }, [])
 
   useFocusEffect(
     useCallback(() => {
-      loadOrders()
+      loadOrders(1)
     }, [])
   )
 
-  const loadOrders = async () => {
+  const loadOrders = async (page = 1, pageSize = itemsPerPage) => {
     try {
       setLoading(true)
-      const response = await salesOrderService.getSalesOrders()
+      const limit = pageSize === 0 ? 1000 : pageSize
+      const response = await salesOrderService.getSalesOrders(page, limit)
       setOrders(response.salesOrders)
+      setTotalItems(response.total || response.salesOrders.length)
+      setTotalPages(Math.max(1, Math.ceil((response.total || response.salesOrders.length) / limit)))
+      setCurrentPage(page)
     } catch (error) {
-      Alert.alert('Error', 'Failed to load sales orders')
+      showError('Error', 'Failed to load sales orders')
     } finally {
       setLoading(false)
     }
@@ -63,9 +71,12 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    await loadOrders()
+    await loadOrders(1)
     setRefreshing(false)
   }
+
+  const handlePageChange = (page: number) => loadOrders(page)
+  const handleItemsPerPageChange = (value: number) => { setItemsPerPage(value); loadOrders(1, value) }
 
   const getStatusColor = (status: SalesOrder['status']) => {
     switch (status) {
@@ -87,18 +98,26 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
     }
   }
 
-  const handleExport = () => {
-    exportToExcel({
-      data: orders,
-      columns: [
-        { key: 'orderNumber', label: 'Order #' },
-        { key: 'status', label: 'Status' },
-        { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${Number(v).toLocaleString()}` },
-        { key: 'orderDate', label: 'Order Date', format: (v: string) => new Date(v).toLocaleDateString() },
-      ],
-      filename: 'sales_orders_export',
-      reportTitle: 'Sales Orders Report',
-    }).then(ok => { if (ok) showSuccess('Export', 'Excel file ready to share') })
+  const handleExport = async () => {
+    try {
+      const response = await salesOrderService.getSalesOrders(1, 10000)
+      const allOrders = response.salesOrders || []
+      const filteredForExport = allOrders.filter(order => filter === 'ALL' || order.status === filter)
+
+      exportToExcel({
+        data: filteredForExport,
+        columns: [
+          { key: 'orderNumber', label: 'Order #' },
+          { key: 'status', label: 'Status' },
+          { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${Number(v).toLocaleString()}` },
+          { key: 'orderDate', label: 'Order Date', format: (v: string) => new Date(v).toLocaleDateString() },
+        ],
+        filename: 'sales_orders_export_filtered',
+        reportTitle: 'Filtered Sales Orders Report',
+      }).then(ok => { if (ok) showSuccess('Export', 'Excel file ready to share') })
+    } catch {
+      showError('Export Failed', 'Unable to load filtered sales orders for export')
+    }
   }
 
   const filteredOrders = orders.filter(order => 
@@ -106,24 +125,23 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
   )
 
   const handleDeleteOrder = (item: SalesOrder) => {
-    Alert.alert(
+    showWarning(
       'Delete Order',
       `Delete order ${item.orderNumber}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
+      {
+        action: {
+          label: 'Delete',
           onPress: async () => {
             try {
               await salesOrderService.deleteSalesOrder(item.id)
               setOrders(prev => prev.filter(o => o.id !== item.id))
+              showSuccess('Deleted', 'Order deleted')
             } catch {
-              Alert.alert('Error', 'Failed to delete order')
+              showError('Error', 'Failed to delete order')
             }
-          },
-        },
-      ]
+          }
+        }
+      }
     )
   }
 
@@ -177,10 +195,10 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
       if (orderData) {
         const updated = await salesOrderService.updateSalesOrder(orderId, { status })
         setOrders(orders.map(o => o.id === orderId ? updated : o))
-        Alert.alert('Success', 'Order status updated successfully')
+        showSuccess('Success', 'Order status updated successfully')
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to update order status')
+      showError('Error', 'Failed to update order status')
     }
   }
 
@@ -430,6 +448,19 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
           ))}
         </View>
       </ScrollView>
+
+      {!loading && orders.length > 0 ? (
+        <View style={{ paddingHorizontal: spacing.base, paddingBottom: spacing.sm }}>
+          <PaginationControl
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={handleItemsPerPageChange}
+            onPageChange={handlePageChange}
+          />
+        </View>
+      ) : null}
       
       <View style={styles.content}>
         <FlatList
@@ -453,12 +484,7 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
         />
       </View>
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('SalesOrderForm')}
-      >
-        <Icon name="add" size={24} color={theme.textInverse} />
-      </TouchableOpacity>
+      {/* global QuickAddPanel provides FAB - removed local FAB */}
     </SafeAreaView>
   )
 }

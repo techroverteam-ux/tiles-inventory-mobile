@@ -31,7 +31,7 @@ type OrderType = 'purchase' | 'sales'
 
 export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, route }) => {
   const { theme } = useTheme()
-  const { showToast, showWarning } = useToast()
+  const { showToast, showWarning, showSuccess, showError } = useToast()
   const commonStyles = getCommonStyles(theme)
 
   // Determine order type from route params
@@ -42,29 +42,32 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [search, setSearch] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('all')
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 20
+  const [itemsPerPage, setItemsPerPage] = useState(5)
 
   useEffect(() => {
     loadOrders(1)
   }, [orderType])
 
-  const loadOrders = async (page: number, q = search) => {
+  const loadOrders = async (page: number, q = search, pageSize = itemsPerPage) => {
     try {
       setLoading(true)
       let ordersData = []
       let total = 0
+      const limit = pageSize === 0 ? 1000 : pageSize
 
       if (orderType === 'purchase') {
-        const response = await purchaseOrderService.getPurchaseOrders(page, itemsPerPage)
+        const response = await purchaseOrderService.getPurchaseOrders(page, limit)
         ordersData = response.purchaseOrders || []
         total = response.total || 0
       } else {
-        const response = await salesOrderService.getSalesOrders(page, itemsPerPage)
+        const response = await salesOrderService.getSalesOrders(page, limit)
         ordersData = response.salesOrders || []
         total = response.total || 0
       }
@@ -80,7 +83,7 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
 
       setOrders(filtered)
       setTotalItems(q.trim() ? filtered.length : total)
-      setTotalPages(Math.max(1, Math.ceil((q.trim() ? filtered.length : total) / itemsPerPage)))
+      setTotalPages(Math.max(1, Math.ceil((q.trim() ? filtered.length : total) / limit)))
       setCurrentPage(page)
     } catch (error) {
       console.error(`Error loading ${orderType} orders:`, error)
@@ -95,6 +98,11 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
     loadOrders(1, q)
   }
 
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value)
+    loadOrders(1, search, value)
+  }
+
   const handleRefresh = async () => {
     setRefreshing(true)
     await loadOrders(1)
@@ -105,22 +113,41 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
     loadOrders(newPage)
   }
 
-  const handleExportData = () => {
-    import('../../utils/exportUtils').then(({ exportToExcel, commonColumns }) => {
-      const isPurchase = orderType === 'purchase'
-      exportToExcel({
-        data: orders,
-        columns: isPurchase ? commonColumns.purchaseOrder : commonColumns.salesOrder,
-        filename: `${orderType}_orders_export`,
-        reportTitle: `${isPurchase ? 'Purchase' : 'Sales'} Orders Report`
-      }).then(success => {
-        if (success) showToast('Excel file ready to share', 'success')
+  const handleExportData = async () => {
+    try {
+      const response = orderType === 'purchase'
+        ? await purchaseOrderService.getPurchaseOrders(1, 10000)
+        : await salesOrderService.getSalesOrders(1, 10000)
+
+      const allOrders = (orderType === 'purchase' ? response.purchaseOrders : response.salesOrders) || []
+      const filteredForExport = allOrders.filter(order => {
+        const orderNum = order.orderNumber?.toLowerCase() || ''
+        const supplier = order.supplierName?.toLowerCase() || ''
+        const customer = order.customerName?.toLowerCase() || ''
+        const searchText = search.toLowerCase()
+        const matchesSearch = !search || orderNum.includes(searchText) || supplier.includes(searchText) || customer.includes(searchText)
+        const matchesStatus = statusFilter === 'all' || order.status === statusFilter
+        return matchesSearch && matchesStatus
       })
-    })
+
+      import('../../utils/exportUtils').then(({ exportToExcel, commonColumns }) => {
+        const columns = orderType === 'purchase' ? commonColumns.purchaseOrder : commonColumns.salesOrder
+        exportToExcel({
+          data: filteredForExport,
+          columns,
+          filename: `${orderType}_orders_export_filtered`,
+          reportTitle: `${orderType === 'purchase' ? 'Filtered Purchase Orders' : 'Filtered Sales Orders'} Report`,
+        }).then(success => {
+          if (success) showSuccess('Export', 'Excel file ready to share')
+        })
+      })
+    } catch {
+      showError('Export Failed', 'Unable to load filtered orders for export')
+    }
   }
 
   const handleToggleFilters = () => {
-    showWarning('Filters', 'Advanced filtering functionality will be available in the next release.')
+    setShowFilters(v => !v)
   }
 
   const handleDelete = (id: string) => {
@@ -139,6 +166,12 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
     )
   }
 
+
+  const filteredOrders = orders.filter((o: any) => statusFilter === 'all' ? true : o.status === statusFilter)
+
+  const filterOptions = orderType === 'purchase'
+    ? ['all', 'PENDING', 'CONFIRMED', 'DELIVERED', 'CANCELLED']
+    : ['all', 'DRAFT', 'CONFIRMED', 'DELIVERED', 'CANCELLED']
 
   const renderOrderItem = ({ item }: { item: PurchaseOrder | SalesOrder }) => {
     const isPurchase = orderType === 'purchase'
@@ -285,29 +318,17 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
     )
   }
 
-  const renderSkeleton = () => {
-    if (viewMode === 'list') {
-      return (
-        <View style={styles.tableRow}>
-          <View style={styles.colOrder}><Skeleton height={16} width="80%" /></View>
-          <View style={styles.colPartner}><Skeleton height={16} width="80%" /></View>
-          <View style={styles.colAmount}><Skeleton height={16} width="60%" /></View>
-          <View style={styles.colDate}><Skeleton height={14} width="80%" /></View>
-        </View>
-      )
-    }
-    return (
-      <Card style={[commonStyles.glassCard, styles.orderCard]}>
-        <View style={{ height: 180, alignItems: 'center', justifyContent: 'center' }}>
-          <Skeleton width={80} height={80} borderRadius={16} />
-        </View>
-        <View style={styles.contentContainer}>
-          <Skeleton width="40%" height={24} style={{ marginBottom: 16 }} />
-          <Skeleton width="100%" height={60} />
-        </View>
-      </Card>
-    )
-  }
+  const renderSkeleton = () => (
+    <Card style={[commonStyles.glassCard, styles.orderCard]}>
+      <View style={{ height: 180, alignItems: 'center', justifyContent: 'center' }}>
+        <Skeleton width={80} height={80} borderRadius={16} />
+      </View>
+      <View style={styles.contentContainer}>
+        <Skeleton width="40%" height={24} style={{ marginBottom: 16 }} />
+        <Skeleton width="100%" height={60} />
+      </View>
+    </Card>
+  )
 
   const styles = StyleSheet.create({
     container: {
@@ -553,9 +574,36 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
           )}
         </View>
       </View>
+
+      {showFilters && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {filterOptions.map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  onPress={() => setStatusFilter(f)}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: statusFilter === f ? theme.primary : theme.border,
+                    backgroundColor: statusFilter === f ? theme.primary : theme.surface,
+                    borderRadius: 999,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                  }}
+                >
+                  <Text style={{ color: statusFilter === f ? theme.primaryForeground : theme.text, fontWeight: '700', fontSize: 12 }}>
+                    {f === 'all' ? 'All' : f}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      )}
       
       <FlatList
-        data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : orders}
+        data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : filteredOrders}
         renderItem={loading ? renderSkeleton : renderItem}
         keyExtractor={(item, index) => loading ? `skel-${index}` : item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
@@ -563,24 +611,20 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={renderListHeader}
         ListFooterComponent={
-          !loading && orders.length > 0 ? (
+          !loading && filteredOrders.length > 0 ? (
             <PaginationControl
               currentPage={currentPage}
               totalPages={totalPages}
-              totalItems={totalItems}
+              totalItems={filteredOrders.length}
               itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
               onPageChange={handlePageChange}
             />
           ) : null
         }
       />
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate(orderType === 'purchase' ? 'PurchaseOrderForm' : 'SalesOrderForm')}
-      >
-        <Icon name="add" size={24} color={theme.textInverse} />
-      </TouchableOpacity>
+      {/* global QuickAddPanel provides FAB - removed local FAB */}
     </SafeAreaView>
   )
 }

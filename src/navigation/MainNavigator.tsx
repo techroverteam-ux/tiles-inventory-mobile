@@ -34,6 +34,7 @@ import { AdminPanelScreen } from '../screens/admin/AdminPanelScreen'
 import { EnhancedDashboardScreen } from '../screens/dashboard/EnhancedDashboardScreen'
 import { SettingsScreen } from '../screens/settings/SettingsScreen'
 import { MainStackParamList, DrawerParamList } from './types'
+import { QuickAddPanel } from '../components/common/QuickAddPanel'
 
 const Stack = createStackNavigator<MainStackParamList>()
 const Drawer = createDrawerNavigator<DrawerParamList>()
@@ -268,6 +269,7 @@ export const MainNavigator: React.FC = () => {
         </Stack.Navigator>
       </View>
       <PersistentBottomBar />
+      <QuickAddPanel />
     </View>
   )
 }

@@ -1,11 +1,12 @@
 import React, { useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, TextInput, ScrollView, Alert,
+  RefreshControl, TextInput, ScrollView, Image,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
+import { launchImageLibrary, MediaType } from 'react-native-image-picker'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
 import { MainHeader } from '../../components/navigation/MainHeader'
@@ -18,6 +19,7 @@ import { getCommonStyles } from '../../theme/commonStyles'
 import { FormModal } from '../../components/common/FormModal'
 import { FormField, ActiveStatusToggle, FormActions } from '../../components/common/FormComponents'
 import { exportToExcel } from '../../utils/exportUtils'
+import { resolvePublicUrl } from '../../config/appConfig'
 
 const fmtDate = (d: string) => {
   const dt = new Date(d)
@@ -26,7 +28,7 @@ const fmtDate = (d: string) => {
 
 export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { theme } = useTheme()
-  const { showSuccess, showError } = useToast()
+  const { showSuccess, showError, showWarning } = useToast()
   const commonStyles = getCommonStyles(theme)
 
   const [locations, setLocations] = useState<Location[]>([])
@@ -39,24 +41,25 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 10
+  const [itemsPerPage, setItemsPerPage] = useState(5)
 
   const [showForm, setShowForm] = useState(false)
   const [editingLocation, setEditingLocation] = useState<Location | null>(null)
-  const [formData, setFormData] = useState({ name: '', address: '', isActive: true })
+  const [formData, setFormData] = useState({ name: '', address: '', isActive: true, imageUri: '', image: null as any })
   const [submitting, setSubmitting] = useState(false)
 
-  const load = useCallback(async (page = 1, q = search, status = statusFilter) => {
+  const load = useCallback(async (page = 1, q = search, status = statusFilter, pageSize = itemsPerPage) => {
     setLoading(true)
     try {
+      const limit = pageSize === 0 ? 1000 : pageSize
       const res = await locationService.getLocations({
-        page, limit: itemsPerPage, search: q,
+        page, limit, search: q,
         isActive: status === 'all' ? undefined : status,
       })
       setLocations(res.locations)
       const total = (res as any).totalCount || res.total || 0
       setTotalItems(total)
-      setTotalPages((res as any).totalPages || Math.max(1, Math.ceil(total / itemsPerPage)))
+      setTotalPages((res as any).totalPages || Math.max(1, Math.ceil(total / limit)))
       setCurrentPage(page)
     } catch { showError('Error', 'Failed to load locations') }
     finally { setLoading(false); setRefreshing(false) }
@@ -66,16 +69,38 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
 
   const handleSearch = (q: string) => { setSearch(q); load(1, q, statusFilter) }
   const handleStatus = (s: typeof statusFilter) => { setStatusFilter(s); load(1, search, s) }
+  const handleItemsPerPageChange = (value: number) => { setItemsPerPage(value); load(1, search, statusFilter, value) }
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) { showError('Error', 'Name is required'); return }
     setSubmitting(true)
     try {
+      const payload = formData.image?.uri
+        ? (() => {
+            const formDataPayload = new FormData()
+            formDataPayload.append('name', formData.name)
+            formDataPayload.append('address', formData.address)
+            formDataPayload.append('isActive', String(formData.isActive))
+            if (editingLocation?.imageUrl) formDataPayload.append('imageUrl', editingLocation.imageUrl)
+            formDataPayload.append('image', {
+              uri: formData.image.uri,
+              type: formData.image.type || 'image/jpeg',
+              name: formData.image.name || `location-${Date.now()}.jpg`,
+            } as any)
+            return formDataPayload
+          })()
+        : {
+            name: formData.name,
+            address: formData.address,
+            isActive: formData.isActive,
+            imageUrl: editingLocation?.imageUrl || undefined,
+          }
+
       if (editingLocation) {
-        await locationService.updateLocation(editingLocation.id, formData)
+        await locationService.updateLocation(editingLocation.id, payload as any)
         showSuccess('Success', 'Location updated')
       } else {
-        await locationService.createLocation(formData)
+        await locationService.createLocation(payload as any)
         showSuccess('Success', 'Location created')
       }
       resetForm(); load(1)
@@ -83,17 +108,32 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
     finally { setSubmitting(false) }
   }
 
-  const handleDelete = (loc: Location) => {
-    Alert.alert('Delete Location', `Delete "${loc.name}"? All stock batches in this location will also be removed.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await locationService.deleteLocation(loc.id); setLocations(p => p.filter(l => l.id !== loc.id)); showSuccess('Deleted', 'Location deleted') }
-        catch { showError('Error', 'Failed to delete location') }
-      }},
-    ])
+  const handleImagePicker = () => {
+    launchImageLibrary({ mediaType: 'photo' as MediaType, quality: 0.8 as any }, (res) => {
+      if (res.assets?.[0]) {
+        const asset = res.assets[0]
+        setFormData(prev => ({
+          ...prev,
+          imageUri: asset.uri || '',
+          image: { uri: asset.uri, type: asset.type, name: asset.fileName },
+        }))
+      }
+    })
   }
 
-  const resetForm = () => { setFormData({ name: '', address: '', isActive: true }); setEditingLocation(null); setShowForm(false) }
+  const handleDelete = (loc: Location) => {
+    showWarning('Delete Location', `Delete "${loc.name}"? All stock batches in this location will also be removed.`, {
+      action: {
+        label: 'Delete',
+        onPress: async () => {
+          try { await locationService.deleteLocation(loc.id); setLocations(p => p.filter(l => l.id !== loc.id)); showSuccess('Deleted', 'Location deleted') }
+          catch { showError('Error', 'Failed to delete location') }
+        }
+      }
+    })
+  }
+
+  const resetForm = () => { setFormData({ name: '', address: '', isActive: true, imageUri: '', image: null }); setEditingLocation(null); setShowForm(false) }
 
   const handleExport = () => {
     exportToExcel({ data: locations, columns: [
@@ -135,7 +175,8 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
     gridCard: { marginBottom: 12, borderRadius: 20, overflow: 'hidden', padding: 0 },
     gridCardInner: { padding: 0 },
     gridIconArea: { height: 120, alignItems: 'center', justifyContent: 'center', backgroundColor: withOpacity(theme.primary, 0.05), position: 'relative' },
-    gridIconWrap: { width: 64, height: 64, borderRadius: 16, backgroundColor: withOpacity(theme.primary, 0.12), alignItems: 'center', justifyContent: 'center' },
+    gridIconWrap: { width: 64, height: 64, borderRadius: 16, backgroundColor: withOpacity(theme.primary, 0.12), alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+    gridImage: { width: '100%', height: '100%', resizeMode: 'cover' },
     gridBadge: { position: 'absolute', top: 10, right: 10, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
     gridBadgeText: { fontSize: 10, fontWeight: '700' },
     gridContent: { padding: 14 },
@@ -170,7 +211,11 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
       <View style={s.gridCardInner}>
         <View style={s.gridIconArea}>
           <View style={s.gridIconWrap}>
-            <Icon name="warehouse" size={32} color={theme.primary} />
+            {item.imageUrl ? (
+              <Image source={{ uri: resolvePublicUrl(item.imageUrl)! }} style={s.gridImage} />
+            ) : (
+              <Icon name="warehouse" size={32} color={theme.primary} />
+            )}
           </View>
           <View style={[s.gridBadge, { backgroundColor: item.isActive ? withOpacity(theme.primary, 0.15) : withOpacity(theme.error, 0.15) }]}>
             <Text style={[s.gridBadgeText, { color: item.isActive ? theme.primary : theme.error }]}>{item.isActive ? 'Active' : 'Inactive'}</Text>
@@ -184,7 +229,7 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
             <Text style={s.gridBatchText}>{(item as any)._count?.batches ?? 0} stock batches</Text>
           </View>
           <View style={s.gridActions}>
-            <TouchableOpacity style={s.editBtn} onPress={() => { setEditingLocation(item); setFormData({ name: item.name, address: item.address || '', isActive: item.isActive ?? true }); setShowForm(true) }}>
+            <TouchableOpacity style={s.editBtn} onPress={() => { setEditingLocation(item); setFormData({ name: item.name, address: item.address || '', isActive: item.isActive ?? true, imageUri: item.imageUrl ? resolvePublicUrl(item.imageUrl) || '' : '', image: null }); setShowForm(true) }}>
               <Icon name="edit" size={14} color={theme.text} /><Text style={s.editBtnText}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.deleteIconBtn} onPress={() => handleDelete(item)}>
@@ -209,7 +254,7 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
         </View>
       </View>
       <View style={s.colActions}>
-        <TouchableOpacity style={s.rowIconBtn} onPress={() => { setEditingLocation(item); setFormData({ name: item.name, address: item.address || '', isActive: item.isActive ?? true }); setShowForm(true) }}>
+        <TouchableOpacity style={s.rowIconBtn} onPress={() => { setEditingLocation(item); setFormData({ name: item.name, address: item.address || '', isActive: item.isActive ?? true, imageUri: item.imageUrl ? resolvePublicUrl(item.imageUrl) || '' : '', image: null }); setShowForm(true) }}>
           <Icon name="edit" size={15} color={theme.text} />
         </TouchableOpacity>
         <TouchableOpacity style={[s.rowIconBtn, { borderColor: theme.error }]} onPress={() => handleDelete(item)}>
@@ -235,7 +280,7 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
       <View style={s.topBar}>
         <View style={s.titleRow}>
           <Text style={s.title}>Locations</Text>
-          <TouchableOpacity style={s.addBtn} onPress={() => { setEditingLocation(null); setFormData({ name: '', address: '', isActive: true }); setShowForm(true) }}>
+          <TouchableOpacity style={s.addBtn} onPress={() => { setEditingLocation(null); setFormData({ name: '', address: '', isActive: true, imageUri: '', image: null }); setShowForm(true) }}>
             <Icon name="add" size={18} color={theme.primaryForeground} />
             <Text style={s.addBtnText}>Add Location</Text>
           </TouchableOpacity>
@@ -303,13 +348,29 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
           <View style={s.empty}><Icon name="warehouse" size={56} color={theme.mutedForeground} /><Text style={s.emptyText}>No locations found</Text></View>
         ) : null}
         ListFooterComponent={!loading && locations.length > 0 ? (
-          <PaginationControl currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} itemsPerPage={itemsPerPage} onPageChange={p => load(p)} />
+          <PaginationControl currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} itemsPerPage={itemsPerPage} onItemsPerPageChange={handleItemsPerPageChange} onPageChange={p => load(p)} />
         ) : null}
       />
 
       <FormModal key={editingLocation?.id ?? 'new'} visible={showForm} title={editingLocation ? 'Edit Location' : 'Add New Location'} onClose={resetForm}>
         <FormField label="Location Name" required value={formData.name} onChangeText={t => setFormData(p => ({ ...p, name: t }))} placeholder="e.g., Warehouse A, Showroom Floor 1" />
         <FormField label="Address (Optional)" value={formData.address} onChangeText={t => setFormData(p => ({ ...p, address: t }))} placeholder="Enter address" multiline numberOfLines={3} style={{ height: 80, textAlignVertical: 'top' }} />
+        <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text, marginBottom: 8 }}>Location Image</Text>
+        <TouchableOpacity style={{ borderWidth: 1.5, borderColor: theme.border, borderStyle: 'dashed', borderRadius: 12, height: 140, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface, marginBottom: 16, overflow: 'hidden' }} onPress={() => launchImageLibrary({ mediaType: 'photo' as MediaType, quality: 0.8 as any }, (res) => { if (res.assets?.[0]) { const asset = res.assets[0]; setFormData(prev => ({ ...prev, imageUri: asset.uri || '', image: { uri: asset.uri, type: asset.type, name: asset.fileName } })) } })}>
+          {formData.imageUri ? (
+            <>
+              <Image source={{ uri: formData.imageUri }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+              <TouchableOpacity style={{ position: 'absolute', top: 6, right: 6, backgroundColor: theme.error, borderRadius: 12, padding: 2 }} onPress={() => setFormData(prev => ({ ...prev, imageUri: '', image: null }))}>
+                <Icon name="close" size={14} color="#fff" />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Icon name="image" size={32} color={theme.mutedForeground} />
+              <Text style={{ fontSize: 13, color: theme.text, marginTop: 6, textAlign: 'center', paddingHorizontal: 16 }}><Text style={{ fontWeight: '700' }}>Tap to upload</Text> a location image</Text>
+            </>
+          )}
+        </TouchableOpacity>
         <ActiveStatusToggle value={formData.isActive} onChange={v => setFormData(p => ({ ...p, isActive: v }))} subtitle="Visible in system operations" />
         <FormActions submitLabel={editingLocation ? 'Update Location' : 'Create Location'} onSubmit={handleSubmit} onCancel={resetForm} loading={submitting} />
       </FormModal>

@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { Header } from '../../components/navigation/Header'
 import { Card } from '../../components/common/Card'
 import { spacing, typography } from '../../theme'
+import { APP_NAME, APP_VERSION } from '../../config/appConfig'
 
 export const AboutScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { theme } = useTheme()
@@ -29,20 +30,20 @@ export const AboutScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       <ScrollView style={styles.content}>
         <View style={styles.logoContainer}>
           <Image source={require('../../assets/images/hot-logo-cropped.png')} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.appName}>Tiles Inventory</Text>
-          <Text style={styles.version}>Version 1.2.0</Text>
+          <Text style={styles.appName}>{APP_NAME}</Text>
+          <Text style={styles.version}>Version {APP_VERSION}</Text>
         </View>
 
         <Card>
-          <View style={styles.row}><Text style={styles.label}>App Name</Text><Text style={styles.value}>Tiles Inventory Mobile</Text></View>
-          <View style={styles.row}><Text style={styles.label}>Version</Text><Text style={styles.value}>1.2.0</Text></View>
+          <View style={styles.row}><Text style={styles.label}>App Name</Text><Text style={styles.value}>{APP_NAME}</Text></View>
+          <View style={styles.row}><Text style={styles.label}>Version</Text><Text style={styles.value}>{APP_VERSION}</Text></View>
           <View style={styles.row}><Text style={styles.label}>Platform</Text><Text style={styles.value}>React Native</Text></View>
           <View style={[styles.row, { borderBottomWidth: 0 }]}><Text style={styles.label}>Developer</Text><Text style={styles.value}>TechRover Team</Text></View>
         </Card>
 
         <Text style={styles.sectionTitle}>Description</Text>
         <Text style={styles.description}>
-          A comprehensive mobile application for managing tiles inventory. Track products, manage stock levels, handle purchase and sales orders, and generate reports — all from your mobile device.
+          A comprehensive mobile application for managing House Of Tiles inventory. Track products, manage stock levels, handle purchase and sales orders, and generate reports — all from your mobile device.
         </Text>
 
         <Text style={styles.sectionTitle}>Contact</Text>

@@ -4,19 +4,21 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   RefreshControl,
   TouchableOpacity,
+  Modal,
+  Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
+import { SelectModal } from '../../components/common/SelectModal'
 import { Header } from '../../components/navigation/Header'
 import { Card } from '../../components/common/Card'
 import { LoadingButton } from '../../components/common/LoadingButton'
 import { LoadingSpinner } from '../../components/loading'
-import { purchaseOrderService, salesOrderService } from '../../services/api/ApiServices'
+import { locationService, purchaseOrderService, salesOrderService, Location } from '../../services/api/ApiServices'
 import { spacing, typography, borderRadius } from '../../theme'
 
 interface OrderDetailScreenProps {
@@ -26,21 +28,39 @@ interface OrderDetailScreenProps {
 
 export const OrderDetailScreen: React.FC<OrderDetailScreenProps> = ({ route, navigation }) => {
   const { theme, isDark } = useTheme()
-  const { showToast } = useToast()
+  const { showToast, showError, showWarning } = useToast()
   const { orderId, orderType = 'purchase' } = route.params || {}
   
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [showDeliverModal, setShowDeliverModal] = useState(false)
+  const [selectedLocationId, setSelectedLocationId] = useState('')
+  const [locations, setLocations] = useState<Location[]>([])
 
   useEffect(() => {
     loadOrderDetails()
   }, [orderId])
 
+  useEffect(() => {
+    if (orderType !== 'purchase') return
+
+    const loadLocations = async () => {
+      try {
+        const response = await locationService.getLocations({ page: 1, limit: 1000, isActive: true })
+        setLocations(response.locations || [])
+      } catch (error) {
+        console.error('Failed to load locations:', error)
+      }
+    }
+
+    loadLocations()
+  }, [orderType])
+
   const loadOrderDetails = async () => {
     if (!orderId) {
-      Alert.alert('Error', 'Order ID is missing')
+      showError('Error', 'Order ID is missing')
       navigation.goBack()
       return
     }
@@ -65,30 +85,51 @@ export const OrderDetailScreen: React.FC<OrderDetailScreenProps> = ({ route, nav
   }
 
   const handleStatusUpdate = async (newStatus: string) => {
-    Alert.alert(
-      'Update Status',
-      `Change order status to ${newStatus}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Update',
-          onPress: async () => {
-            setUpdating(true)
-            try {
-              const service = orderType === 'purchase' ? purchaseOrderService : salesOrderService
-              await service.updateStatus(orderId, newStatus as any)
-              showToast('Status updated successfully', 'success')
-              await loadOrderDetails()
-            } catch (error) {
-              console.error('Failed to update status:', error)
-              showToast('Failed to update status', 'error')
-            } finally {
-              setUpdating(false)
-            }
-          },
-        },
-      ]
-    )
+    if (orderType === 'purchase' && newStatus.toLowerCase() === 'delivered') {
+      setSelectedLocationId('')
+      setShowDeliverModal(true)
+      return
+    }
+
+    showWarning('Update Status', `Change order status to ${newStatus}?`, {
+      action: {
+        label: 'Update',
+        onPress: async () => {
+          setUpdating(true)
+          try {
+            const service = orderType === 'purchase' ? purchaseOrderService : salesOrderService
+            await service.updateStatus(orderId, newStatus.toUpperCase() as any)
+            showToast('Status updated successfully', 'success')
+            await loadOrderDetails()
+          } catch (error) {
+            console.error('Failed to update status:', error)
+            showToast('Failed to update status', 'error')
+          } finally {
+            setUpdating(false)
+          }
+        }
+      }
+    })
+  }
+
+  const handleDeliverToLocation = async () => {
+    if (!selectedLocationId) {
+      showError('Error', 'Please select a location')
+      return
+    }
+
+    setUpdating(true)
+    try {
+      await purchaseOrderService.deliverPurchaseOrder(orderId, selectedLocationId)
+      showToast('Order received into inventory', 'success')
+      setShowDeliverModal(false)
+      await loadOrderDetails()
+    } catch (error) {
+      console.error('Failed to deliver purchase order:', error)
+      showToast('Failed to update inventory', 'error')
+    } finally {
+      setUpdating(false)
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -393,6 +434,48 @@ export const OrderDetailScreen: React.FC<OrderDetailScreenProps> = ({ route, nav
           </View>
         )}
       </ScrollView>
+
+      <Modal visible={showDeliverModal} transparent animationType="fade" onRequestClose={() => setShowDeliverModal(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }} onPress={() => setShowDeliverModal(false)}>
+          <Pressable style={{ backgroundColor: theme.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: spacing.base, paddingBottom: spacing['2xl'] }} onPress={() => {}}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.base }}>
+              <Text style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: theme.text }}>Receive to Location</Text>
+              <TouchableOpacity onPress={() => setShowDeliverModal(false)}>
+                <Icon name="close" size={22} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ color: theme.textSecondary, marginBottom: spacing.base }}>
+              Choose where these items should be added to inventory.
+            </Text>
+
+            <SelectModal
+              label="Location"
+              value={selectedLocationId}
+              options={locations.map(location => ({ id: location.id, name: location.name }))}
+              onSelect={setSelectedLocationId}
+              placeholder="Select a location"
+              required
+            />
+
+            <LoadingButton
+              title={updating ? 'Updating...' : 'Update Inventory'}
+              loading={updating}
+              onPress={handleDeliverToLocation}
+              style={{ marginTop: spacing.base }}
+            />
+
+            <LoadingButton
+              title="Cancel"
+              loading={false}
+              variant="outline"
+              onPress={() => setShowDeliverModal(false)}
+              style={{ marginTop: spacing.sm, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }}
+              textStyle={{ color: theme.text }}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   )
 }

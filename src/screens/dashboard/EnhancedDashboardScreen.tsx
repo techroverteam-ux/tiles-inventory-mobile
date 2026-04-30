@@ -9,12 +9,10 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as LucideIcons from 'lucide-react-native'
 import { useTheme } from '../../context/ThemeContext'
 import { useNavigation } from '@react-navigation/native'
 import { MainHeader } from '../../components/navigation/MainHeader'
-import { QuickAddPanel } from '../../components/common/QuickAddPanel'
 import { DashboardCard } from '../../components/dashboard/DashboardCard'
 import { getCommonStyles } from '../../theme/commonStyles'
 import { withOpacity } from '../../utils/colorUtils'
@@ -70,7 +68,6 @@ export const EnhancedDashboardScreen: React.FC = () => {
   const commonStyles = getCommonStyles(theme)
   const navigation = useNavigation<any>()
   const { showInfo } = useToast()
-  const insets = useSafeAreaInsets()
   const [refreshing, setRefreshing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<DashboardStats>({
@@ -406,28 +403,7 @@ export const EnhancedDashboardScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      <TouchableOpacity 
-        style={{
-          position: 'absolute',
-          right: 24,
-          bottom: 24 + insets.bottom,
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          backgroundColor: '#60a5fa',
-          alignItems: 'center',
-          justifyContent: 'center',
-          elevation: 5,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 6,
-        }}
-        activeOpacity={0.8}
-        onPress={() => navigation.navigate('ProductForm')}
-      >
-        <LucideIcons.Plus size={24} color="#0f172a" strokeWidth={3} />
-      </TouchableOpacity>
+      {/* global QuickAddPanel is mounted in MainNavigator; do not render here */}
     </View>
   )
 }

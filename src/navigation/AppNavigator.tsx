@@ -9,6 +9,7 @@ import { MainNavigator } from './MainNavigator'
 import { WebsiteNavigator } from './WebsiteNavigator'
 import { LoadingScreen } from '../components/loading/LoadingScreen'
 import { RootStackParamList } from './types'
+import { navigationRef } from './navigationRef'
 
 const Stack = createStackNavigator<RootStackParamList>()
 
@@ -41,7 +42,7 @@ export const AppNavigator: React.FC = () => {
         backgroundColor={theme.surface}
         translucent={false}
       />
-      <NavigationContainer theme={navigationTheme}>
+      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <Stack.Navigator id="RootStack" screenOptions={{ headerShown: false }}>
           {isAuthenticated ? (
             <Stack.Screen name="Main" component={MainNavigator} />

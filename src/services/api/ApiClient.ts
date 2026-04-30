@@ -1,13 +1,13 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { SecureStorage } from '../storage/SecureStorage'
+import { API_BASE_URL } from '../../config/appConfig'
 
 class ApiClient {
   private instance: AxiosInstance
   private baseURL: string
 
   constructor() {
-    // Use production API for tiles inventory
-    this.baseURL = 'https://tiles-inventory.vercel.app/api'
+    this.baseURL = API_BASE_URL
     
     this.instance = axios.create({
       baseURL: this.baseURL,

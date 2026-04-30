@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   RefreshControl,
   ScrollView,
 } from 'react-native'
@@ -16,6 +15,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
 import { MainHeader } from '../../components/navigation/MainHeader'
 import { ScreenActionBar } from '../../components/common/ScreenActionBar'
+import { PaginationControl } from '../../components/common/PaginationControl'
 import { getCommonStyles } from '../../theme/commonStyles'
 import { Card } from '../../components/common/Card'
 import { Skeleton } from '../../components/loading/Skeleton'
@@ -29,25 +29,33 @@ interface PurchaseOrderListScreenProps {
 
 export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = ({ navigation }) => {
   const { theme } = useTheme()
-  const { showSuccess } = useToast()
+  const { showSuccess, showError, showWarning } = useToast()
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED'>('ALL')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
   const commonStyles = getCommonStyles(theme)
 
-  useEffect(() => { loadOrders() }, [])
+  useEffect(() => { loadOrders(1) }, [])
 
-  useFocusEffect(useCallback(() => { loadOrders() }, []))
+  useFocusEffect(useCallback(() => { loadOrders(1) }, []))
 
-  const loadOrders = async () => {
+  const loadOrders = async (page = 1, pageSize = itemsPerPage) => {
     try {
       setLoading(true)
-      const response = await purchaseOrderService.getPurchaseOrders()
+      const limit = pageSize === 0 ? 1000 : pageSize
+      const response = await purchaseOrderService.getPurchaseOrders(page, limit)
       setOrders(response.purchaseOrders)
+      setTotalItems(response.total || response.purchaseOrders.length)
+      setTotalPages(Math.max(1, Math.ceil((response.total || response.purchaseOrders.length) / limit)))
+      setCurrentPage(page)
     } catch (error) {
-      Alert.alert('Error', 'Failed to load purchase orders')
+      showError('Error', 'Failed to load purchase orders')
     } finally {
       setLoading(false)
     }
@@ -55,55 +63,65 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    await loadOrders()
+    await loadOrders(1)
     setRefreshing(false)
   }
+
+  const handlePageChange = (page: number) => loadOrders(page)
+  const handleItemsPerPageChange = (value: number) => { setItemsPerPage(value); loadOrders(1, value) }
 
   const handleUpdateStatus = async (orderId: string, status: PurchaseOrder['status']) => {
     try {
       const updated = await purchaseOrderService.updateStatus(orderId, status)
       setOrders(orders.map(o => o.id === orderId ? updated : o))
-      Alert.alert('Success', 'Order status updated successfully')
+      showSuccess('Success', 'Order status updated successfully')
     } catch (error) {
-      Alert.alert('Error', 'Failed to update order status')
+      showError('Error', 'Failed to update order status')
     }
   }
 
   const handleDeleteOrder = (item: PurchaseOrder) => {
-    Alert.alert(
+    showWarning(
       'Delete Order',
       `Delete order ${item.orderNumber}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
+      {
+        action: {
+          label: 'Delete',
           onPress: async () => {
             try {
               await purchaseOrderService.deletePurchaseOrder(item.id)
               setOrders(prev => prev.filter(o => o.id !== item.id))
+              showSuccess('Deleted', 'Order deleted')
             } catch {
-              Alert.alert('Error', 'Failed to delete order')
+              showError('Error', 'Failed to delete order')
             }
-          },
-        },
-      ]
+          }
+        }
+      }
     )
   }
 
-  const handleExport = () => {
-    exportToExcel({
-      data: orders,
-      columns: [
-        { key: 'orderNumber', label: 'Order #' },
-        { key: 'brand.name', label: 'Brand', format: (v: any) => v || (orders[0] as any)?.supplierName || 'N/A' },
-        { key: 'status', label: 'Status' },
-        { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${Number(v).toLocaleString()}` },
-        { key: 'orderDate', label: 'Order Date', format: (v: string) => new Date(v).toLocaleDateString() },
-      ],
-      filename: 'purchase_orders_export',
-      reportTitle: 'Purchase Orders Report',
-    }).then(ok => { if (ok) showSuccess('Export', 'Excel file ready to share') })
+  const handleExport = async () => {
+    try {
+      const response = await purchaseOrderService.getPurchaseOrders(1, 10000)
+      const allOrders = response.purchaseOrders || []
+      const filteredForExport = allOrders.filter(order => filter === 'ALL' || order.status === filter)
+
+      exportToExcel({
+        data: filteredForExport,
+        columns: [
+          { key: 'orderNumber', label: 'Order #' },
+          { key: 'brand.name', label: 'Brand', format: (v: any) => v || (orders[0] as any)?.supplierName || 'N/A' },
+          { key: 'status', label: 'Status' },
+          { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${Number(v).toLocaleString()}` },
+          { key: 'orderDate', label: 'Order Date', format: (v: string) => new Date(v).toLocaleDateString() },
+        ],
+        filename: 'purchase_orders_export_filtered',
+        reportTitle: 'Filtered Purchase Orders Report',
+      }).then(ok => { if (ok) showSuccess('Export', 'Excel file ready to share') })
+    } catch {
+      showError('Export Failed', 'Unable to load filtered purchase orders for export')
+    }
   }
 
   const filteredOrders = orders.filter(order =>
@@ -271,12 +289,20 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
               </View>
             ) : null
           }
+          ListFooterComponent={!loading && filteredOrders.length > 0 ? (
+            <PaginationControl
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
+              onPageChange={handlePageChange}
+            />
+          ) : null}
         />
       </View>
 
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('PurchaseOrderForm')}>
-        <Icon name="add" size={24} color={theme.textInverse} />
-      </TouchableOpacity>
+      {/* global QuickAddPanel provides FAB - removed local FAB */}
     </SafeAreaView>
   )
 }

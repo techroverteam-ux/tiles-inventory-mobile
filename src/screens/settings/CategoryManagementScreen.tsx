@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, TextInput, ScrollView, Alert,
+  RefreshControl, TextInput, ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
@@ -27,37 +27,38 @@ const fmtDate = (d: string) => {
 
 export const CategoryManagementScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { theme } = useTheme()
-  const { showSuccess, showError } = useToast()
+  const { showSuccess, showError, showWarning } = useToast()
   const commonStyles = getCommonStyles(theme)
 
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'true' | 'false'>('all')
   const [showFilters, setShowFilters] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 10
+  const [itemsPerPage, setItemsPerPage] = useState(5)
 
   const [showForm, setShowForm] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [formData, setFormData] = useState({ name: '', description: '', isActive: true })
   const [submitting, setSubmitting] = useState(false)
 
-  const load = useCallback(async (page = 1, q = search, status = statusFilter) => {
+  const load = useCallback(async (page = 1, q = search, status = statusFilter, pageSize = itemsPerPage) => {
     setLoading(true)
     try {
+      const limit = pageSize === 0 ? 1000 : pageSize
       const res = await categoryService.getCategories({
-        page, limit: itemsPerPage, search: q,
+        page, limit, search: q,
         isActive: status === 'all' ? undefined : status,
       } as any)
       setCategories(res.categories)
       const total = (res as any).totalCount || res.total || 0
       setTotalItems(total)
-      setTotalPages((res as any).totalPages || Math.max(1, Math.ceil(total / itemsPerPage)))
+      setTotalPages((res as any).totalPages || Math.max(1, Math.ceil(total / limit)))
       setCurrentPage(page)
     } catch { showError('Error', 'Failed to load categories') }
     finally { setLoading(false); setRefreshing(false) }
@@ -67,6 +68,7 @@ export const CategoryManagementScreen: React.FC<{ navigation: any }> = ({ naviga
 
   const handleSearch = (q: string) => { setSearch(q); load(1, q, statusFilter) }
   const handleStatus = (s: typeof statusFilter) => { setStatusFilter(s); load(1, search, s) }
+  const handleItemsPerPageChange = (value: number) => { setItemsPerPage(value); load(1, search, statusFilter, value) }
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) { showError('Error', 'Name is required'); return }
@@ -85,13 +87,15 @@ export const CategoryManagementScreen: React.FC<{ navigation: any }> = ({ naviga
   }
 
   const handleDelete = (cat: Category) => {
-    Alert.alert('Delete Category', `Delete "${cat.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await categoryService.deleteCategory(cat.id); setCategories(p => p.filter(c => c.id !== cat.id)); showSuccess('Deleted', 'Category deleted') }
-        catch { showError('Error', 'Failed to delete category') }
-      }},
-    ])
+    showWarning('Delete Category', `Delete "${cat.name}"?`, {
+      action: {
+        label: 'Delete',
+        onPress: async () => {
+          try { await categoryService.deleteCategory(cat.id); setCategories(p => p.filter(c => c.id !== cat.id)); showSuccess('Deleted', 'Category deleted') }
+          catch { showError('Error', 'Failed to delete category') }
+        }
+      }
+    })
   }
 
   const resetForm = () => { setFormData({ name: '', description: '', isActive: true }); setEditingCategory(null); setShowForm(false) }
@@ -297,7 +301,7 @@ export const CategoryManagementScreen: React.FC<{ navigation: any }> = ({ naviga
           <View style={s.empty}><Icon name="category" size={56} color={theme.mutedForeground} /><Text style={s.emptyText}>No categories found</Text></View>
         ) : null}
         ListFooterComponent={!loading && categories.length > 0 ? (
-          <PaginationControl currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} itemsPerPage={itemsPerPage} onPageChange={p => load(p)} />
+          <PaginationControl currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} itemsPerPage={itemsPerPage} onItemsPerPageChange={handleItemsPerPageChange} onPageChange={p => load(p)} />
         ) : null}
       />
 

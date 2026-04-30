@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, TextInput, ScrollView, Modal,
+  RefreshControl, TextInput, ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
@@ -27,36 +27,37 @@ const fmtDate = (d: string) => {
 
 export const BrandManagementScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { theme } = useTheme()
-  const { showSuccess, showError } = useToast()
+  const { showSuccess, showError, showWarning } = useToast()
   const commonStyles = getCommonStyles(theme)
 
   const [brands, setBrands] = useState<Brand[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'true' | 'false'>('all')
   const [showFilters, setShowFilters] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 10
+  const [itemsPerPage, setItemsPerPage] = useState(5)
 
   const [showForm, setShowForm] = useState(false)
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null)
   const [formData, setFormData] = useState({ name: '', description: '', isActive: true })
   const [submitting, setSubmitting] = useState(false)
 
-  const load = useCallback(async (page = 1, q = search, status = statusFilter) => {
+  const load = useCallback(async (page = 1, q = search, status = statusFilter, pageSize = itemsPerPage) => {
     setLoading(true)
     try {
+      const limit = pageSize === 0 ? 1000 : pageSize
       const res = await brandService.getBrands({
-        page, limit: itemsPerPage, search: q,
+        page, limit, search: q,
         isActive: status === 'all' ? undefined : status,
       })
       setBrands(res.brands)
       setTotalItems(res.totalCount || res.total || 0)
-      setTotalPages(res.totalPages || Math.max(1, Math.ceil((res.totalCount || res.total || 0) / itemsPerPage)))
+      setTotalPages(res.totalPages || Math.max(1, Math.ceil((res.totalCount || res.total || 0) / limit)))
       setCurrentPage(page)
     } catch { showError('Error', 'Failed to load brands') }
     finally { setLoading(false); setRefreshing(false) }
@@ -67,6 +68,7 @@ export const BrandManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
   const handleSearch = (q: string) => { setSearch(q); load(1, q, statusFilter) }
   const handleStatus = (s: typeof statusFilter) => { setStatusFilter(s); load(1, search, s) }
   const handlePage = (p: number) => load(p)
+  const handleItemsPerPageChange = (value: number) => { setItemsPerPage(value); load(1, search, statusFilter, value) }
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) { showError('Error', 'Name is required'); return }
@@ -85,14 +87,15 @@ export const BrandManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
   }
 
   const handleDelete = (brand: Brand) => {
-    const { Alert } = require('react-native')
-    Alert.alert('Delete Brand', `Delete "${brand.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await brandService.deleteBrand(brand.id); setBrands(p => p.filter(b => b.id !== brand.id)); showSuccess('Deleted', 'Brand deleted') }
-        catch { showError('Error', 'Failed to delete brand') }
-      }},
-    ])
+    showWarning('Delete Brand', `Delete "${brand.name}"?`, {
+      action: {
+        label: 'Delete',
+        onPress: async () => {
+          try { await brandService.deleteBrand(brand.id); setBrands(p => p.filter(b => b.id !== brand.id)); showSuccess('Deleted', 'Brand deleted') }
+          catch { showError('Error', 'Failed to delete brand') }
+        }
+      }
+    })
   }
 
   const resetForm = () => { setFormData({ name: '', description: '', isActive: true }); setEditingBrand(null); setShowForm(false) }
@@ -349,7 +352,7 @@ export const BrandManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
           </View>
         ) : null}
         ListFooterComponent={!loading && brands.length > 0 ? (
-          <PaginationControl currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} itemsPerPage={itemsPerPage} onPageChange={handlePage} />
+          <PaginationControl currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} itemsPerPage={itemsPerPage} onItemsPerPageChange={handleItemsPerPageChange} onPageChange={handlePage} />
         ) : null}
       />
 

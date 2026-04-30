@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
@@ -28,7 +27,7 @@ interface SettingsScreenProps {
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const { theme, toggleTheme, isDark } = useTheme()
   const { user, logout } = useSession()
-  const { showSuccess, showError } = useToast()
+  const { showSuccess, showError, showWarning, showInfo } = useToast()
   const [loading, setLoading] = useState(false)
   
   const [profileData, setProfileData] = useState({
@@ -44,55 +43,41 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   const commonStyles = getCommonStyles(theme)
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: () => {
-            logout()
-            showSuccess('Logged out successfully')
-          },
+    showWarning('Logout', 'Are you sure you want to logout?', {
+      action: {
+        label: 'Logout',
+        onPress: () => {
+          logout()
+          showSuccess('Logged out successfully')
         },
-      ]
-    )
+      },
+    })
   }
 
   const handleDeleteAllData = () => {
-    Alert.alert(
-      '⚠️ Delete All Data',
+    showWarning(
+      'Delete All Data',
       'This will permanently wipe ALL brands, categories, products, inventory, and orders. This CANNOT be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'I Understand',
-          style: 'destructive',
+      {
+        action: {
+          label: 'I Understand',
           onPress: () => {
-            Alert.alert(
-              'Final Confirmation',
-              'Are you absolutely sure? All data will be permanently deleted.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete Everything',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      await apiClient.post('/admin/danger', { action: 'delete-all-data' })
-                      showSuccess('All data deleted')
-                    } catch {
-                      showError('Failed to delete data')
-                    }
-                  },
+            showWarning('Final Confirmation', 'Are you absolutely sure? All data will be permanently deleted.', {
+              action: {
+                label: 'Delete Everything',
+                onPress: async () => {
+                  try {
+                    await apiClient.post('/admin/danger', { action: 'delete-all-data' })
+                    showSuccess('All data deleted')
+                  } catch {
+                    showError('Failed to delete data')
+                  }
                 },
-              ]
-            )
+              },
+            })
           },
         },
-      ]
+      }
     )
   }
 
@@ -432,7 +417,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
             icon="info"
             title="About"
             subtitle="App version and information"
-            onPress={() => Alert.alert('About', 'Tiles Inventory Mobile v1.0.0')}
+            onPress={() => showInfo('About', 'House Of Tiles v1.2.0')}
           />
         </SettingsSection>
 
@@ -457,10 +442,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
         </Card>
       </ScrollView>
 
-      {/* Floating Action Button */}
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('Profile')}>
-        <Icon name="person" size={24} color="#0f172a" />
-      </TouchableOpacity>
+      {/* local FAB removed; profile is available via header profile menu */}
     </SafeAreaView>
   )
 }

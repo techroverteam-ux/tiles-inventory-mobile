@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { launchImageLibrary, MediaType } from 'react-native-image-picker'
@@ -64,6 +64,10 @@ export const StockUpdateScreen: React.FC<{ navigation: any; route: any }> = ({ n
     return Object.keys(e).length === 0
   }
 
+  const isEntryValid = (entry: StockEntry) => {
+    return !!entry.productId && !!entry.quantity && !isNaN(Number(entry.quantity))
+  }
+
   const handleImagePicker = () => {
     launchImageLibrary({ mediaType: 'photo' as MediaType, quality: 0.8 as any }, (res) => {
       if (res.assets?.[0]) {
@@ -113,7 +117,7 @@ export const StockUpdateScreen: React.FC<{ navigation: any; route: any }> = ({ n
     }
   }
 
-  const count = (validate(formData) ? 1 : 0) + queued.length
+  const count = (isEntryValid(formData) ? 1 : 0) + queued.length
   const submitLabel = loading ? 'Saving...' : count > 1 ? `Add ${count} Stock Batches` : 'Add Stock Batch'
 
   const productOptions = products.map(p => ({ id: p.id, name: p.name }))

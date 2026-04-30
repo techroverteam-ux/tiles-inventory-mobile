@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   RefreshControl,
   Image,
 } from 'react-native'
@@ -33,7 +32,7 @@ interface CategoryDetailItem {
 
 export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({ route, navigation }) => {
   const { theme } = useTheme()
-  const { showToast } = useToast()
+  const { showToast, showError } = useToast()
   const { categoryId } = route.params || {}
   
   const [category, setCategory] = useState<CategoryDetailItem | null>(null)
@@ -46,7 +45,7 @@ export const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({ rout
 
   const loadCategoryDetails = async () => {
     if (!categoryId) {
-      Alert.alert('Error', 'Category ID is missing')
+      showError('Error', 'Category ID is missing')
       navigation.goBack()
       return
     }

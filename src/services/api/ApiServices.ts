@@ -187,9 +187,12 @@ export const purchaseOrderService = {
 
   updatePurchaseOrder: async (id: string, data: {
     orderNumber?: string
-    brandId?: string
+    productId?: string
     orderDate?: string
     expectedDate?: string
+    quantity?: number
+    amount?: number
+    batchName?: string
     status?: string
   }): Promise<any> => {
     try {
@@ -203,10 +206,20 @@ export const purchaseOrderService = {
 
   updateStatus: async (id: string, status: 'PENDING' | 'CONFIRMED' | 'RECEIVED' | 'DELIVERED' | 'CANCELLED'): Promise<PurchaseOrder> => {
     try {
-      const response = await apiClient.put(`/purchase-orders/${id}`, { status })
+      const response = await apiClient.patch(`/purchase-orders/${id}/status`, { status })
       return response.data
     } catch (error) {
       console.error('Failed to update purchase order status:', error)
+      throw error
+    }
+  },
+
+  deliverPurchaseOrder: async (id: string, locationId: string): Promise<PurchaseOrder> => {
+    try {
+      const response = await apiClient.post(`/purchase-orders/${id}/deliver`, { locationId })
+      return response.data
+    } catch (error) {
+      console.error('Failed to deliver purchase order:', error)
       throw error
     }
   },
@@ -301,14 +314,14 @@ export const salesOrderService = {
 
   updateSalesOrder: async (id: string, data: {
     orderNumber?: string
-    brandId?: string
-    categoryId?: string
-    sizeId?: string
+    productId?: string
     locationId?: string
+    batchId?: string
     batchName?: string
     quantity?: number
     amount?: number
     soldDate?: string
+    status?: string
   }): Promise<any> => {
     try {
       const response = await apiClient.put(`/sales-orders/${id}`, data)
@@ -769,6 +782,7 @@ export interface Location {
   name: string
   address?: string
   code?: string
+  imageUrl?: string
   isActive?: boolean
   createdAt: string
   updatedAt?: string
@@ -815,7 +829,9 @@ export const locationService = {
 
   createLocation: async (data: Partial<Location>): Promise<Location> => {
     try {
-      const response = await apiClient.post('/locations', data)
+      const response = data instanceof FormData
+        ? await apiClient.uploadFile('/locations', data)
+        : await apiClient.post('/locations', data)
       return response.data
     } catch (error) {
       throw error
@@ -824,7 +840,9 @@ export const locationService = {
 
   updateLocation: async (id: string, data: Partial<Location>): Promise<Location> => {
     try {
-      const response = await apiClient.put(`/locations/${id}`, data)
+      const response = data instanceof FormData
+        ? await apiClient.uploadFile(`/locations/${id}`, data)
+        : await apiClient.put(`/locations/${id}`, data)
       return response.data
     } catch (error) {
       throw error
@@ -926,12 +944,16 @@ export const productService = {
   },
 
   createProduct: async (data: CreateProductRequest): Promise<Product> => {
-    const response = await apiClient.post('/products', data)
+    const response = data instanceof FormData
+      ? await apiClient.uploadFile('/products', data)
+      : await apiClient.post('/products', data)
     return response.data
   },
 
   updateProduct: async (id: string, data: CreateProductRequest): Promise<Product> => {
-    const response = await apiClient.put(`/products/${id}`, data)
+    const response = data instanceof FormData
+      ? await apiClient.uploadFile(`/products/${id}`, data)
+      : await apiClient.put(`/products/${id}`, data)
     return response.data
   },
 

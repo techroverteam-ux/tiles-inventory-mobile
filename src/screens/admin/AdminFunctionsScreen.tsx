@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
 } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
@@ -22,7 +21,7 @@ interface AdminFunctionsScreenProps {
 
 export const AdminFunctionsScreen: React.FC<AdminFunctionsScreenProps> = ({ navigation }) => {
   const { theme } = useTheme()
-  const { showToast } = useToast()
+  const { showToast, showWarning, showSuccess } = useToast()
   const [cleanupLoading, setCleanupLoading] = useState(false)
   const [dangerLoading, setDangerLoading] = useState(false)
 
@@ -111,17 +110,15 @@ export const AdminFunctionsScreen: React.FC<AdminFunctionsScreenProps> = ({ navi
   })
 
   const handleCleanup = () => {
-    Alert.alert(
+    showWarning(
       'Cleanup Confirmation',
-      'This will permanently delete all soft-deleted records (items with _del_ in their names). This action cannot be undone.\n\nAre you sure you want to proceed?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Proceed',
-          style: 'destructive',
+      'This will permanently delete all soft-deleted records (items with _del_ in their names). This action cannot be undone. Are you sure you want to proceed?',
+      {
+        action: {
+          label: 'Proceed',
           onPress: performCleanup,
         },
-      ]
+      }
     )
   }
 
@@ -129,14 +126,11 @@ export const AdminFunctionsScreen: React.FC<AdminFunctionsScreenProps> = ({ navi
     setCleanupLoading(true)
     try {
       const response: any = await apiClient.post('/admin/cleanup')
-      
-      Alert.alert(
+
+      showSuccess(
         'Cleanup Complete',
-        `Successfully cleaned up:\n• ${response.data.deleted.brands} brands\n• ${response.data.deleted.categories} categories\n• ${response.data.deleted.sizes} sizes\n• ${response.data.deleted.products} products`,
-        [{ text: 'OK' }]
+        `Cleaned: ${response.data.deleted.brands} brands, ${response.data.deleted.categories} categories, ${response.data.deleted.sizes} sizes, ${response.data.deleted.products} products`
       )
-      
-      showToast('Cleanup completed successfully', 'success')
     } catch (error: any) {
       const message = error.response?.data?.error || 'Cleanup failed'
       showToast(message, 'error')
@@ -146,47 +140,33 @@ export const AdminFunctionsScreen: React.FC<AdminFunctionsScreenProps> = ({ navi
   }
 
   const handleDangerOperation = () => {
-    Alert.alert(
-      '⚠️ DANGER ZONE ⚠️',
-      'This is a dangerous operation that could affect your entire database. Only proceed if you know exactly what you are doing.\n\nThis action is IRREVERSIBLE!',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'I Understand',
-          style: 'destructive',
+    showWarning(
+      'Danger Zone',
+      'This operation can affect your entire database and is irreversible.',
+      {
+        action: {
+          label: 'I Understand',
           onPress: confirmDangerOperation,
         },
-      ]
+      }
     )
   }
 
   const confirmDangerOperation = () => {
-    Alert.alert(
-      'Final Confirmation',
-      'Are you absolutely sure? This will perform a dangerous database operation.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Execute',
-          style: 'destructive',
-          onPress: performDangerOperation,
-        },
-      ]
-    )
+    showWarning('Final Confirmation', 'Are you absolutely sure? This will perform a dangerous database operation.', {
+      action: {
+        label: 'Execute',
+        onPress: performDangerOperation,
+      },
+    })
   }
 
   const performDangerOperation = async () => {
     setDangerLoading(true)
     try {
       const response: any = await apiClient.post('/admin/danger')
-      
-      Alert.alert(
-        'Operation Complete',
-        response.data.message || 'Danger operation completed',
-        [{ text: 'OK' }]
-      )
-      
-      showToast('Danger operation completed', 'success')
+
+      showSuccess('Operation Complete', response.data.message || 'Danger operation completed')
     } catch (error: any) {
       const message = error.response?.data?.error || 'Operation failed'
       showToast(message, 'error')

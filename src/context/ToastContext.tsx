@@ -280,7 +280,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
       }}
     >
       {children}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
         <View style={{ 
           position: 'absolute',
           bottom: 100,
@@ -288,7 +288,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
           right: 0,
           alignItems: 'center',
           gap: spacing.sm 
-        }}>
+        }} pointerEvents="box-none">
           {toasts.map((toast, index) => (
             <ToastItem
               key={toast.id}

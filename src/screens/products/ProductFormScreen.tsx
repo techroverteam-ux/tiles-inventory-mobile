@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
 } from 'react-native'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
 import { launchImageLibrary, MediaType } from 'react-native-image-picker'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '../../context/ThemeContext'
+import { useToast } from '../../context/ToastContext'
 import { SelectModal } from '../../components/common/SelectModal'
 import { FormField, FormRow, SectionBox, FormActions } from '../../components/common/FormComponents'
 import { MainStackParamList } from '../../navigation/types'
@@ -36,6 +37,7 @@ const emptyEntry = (): ProductEntry => ({
 export const ProductFormScreen: React.FC = () => {
   const { theme } = useTheme()
   const navigation = useNavigation()
+  const { showError, showSuccess } = useToast()
   const route = useRoute<ProductFormRouteProp>()
   const { productId, product: existingProduct } = route.params || {}
 
@@ -68,7 +70,7 @@ export const ProductFormScreen: React.FC = () => {
       setBrands(b.brands.filter(x => x.isActive))
       setCategories(c.categories.filter(x => x.isActive))
       setSizes(s.sizes.filter(x => x.isActive))
-    } catch { Alert.alert('Error', 'Failed to load form data') }
+    } catch { showError('Error', 'Failed to load form data') }
   }, [])
 
   useEffect(() => { fetchMasterData() }, [fetchMasterData])
@@ -116,12 +118,35 @@ export const ProductFormScreen: React.FC = () => {
       sizeId: entry.sizeId || undefined,
       sqftPerBox: entry.sqftPerBox ? parseFloat(entry.sqftPerBox) : undefined,
       pcsPerBox: entry.pcsPerBox ? parseInt(entry.pcsPerBox) : undefined,
-      image: entry.image || undefined,
     }
+
+    const hasPickedImage = !!entry.image?.uri
+    const payload = hasPickedImage
+      ? (() => {
+          const formData = new FormData()
+          formData.append('name', data.name)
+          formData.append('code', data.code)
+          formData.append('brandId', data.brandId)
+          formData.append('categoryId', data.categoryId)
+          if (data.sizeId) formData.append('sizeId', data.sizeId)
+          if (typeof data.sqftPerBox !== 'undefined') formData.append('sqftPerBox', String(data.sqftPerBox))
+          if (typeof data.pcsPerBox !== 'undefined') formData.append('pcsPerBox', String(data.pcsPerBox))
+          if (existingProduct?.imageUrl) formData.append('imageUrl', existingProduct.imageUrl)
+          formData.append('image', {
+            uri: entry.image.uri,
+            type: entry.image.type || 'image/jpeg',
+            name: entry.image.name || `product-${Date.now()}.jpg`,
+          } as any)
+          return formData
+        })()
+      : {
+          ...data,
+          imageUrl: existingProduct?.imageUrl || undefined,
+        }
     if (editId) {
-      await productService.updateProduct(editId, data)
+      await productService.updateProduct(editId, payload as any)
     } else {
-      await productService.createProduct(data)
+      await productService.createProduct(payload as any)
     }
   }
 
@@ -133,11 +158,10 @@ export const ProductFormScreen: React.FC = () => {
       const all = editId ? [formData] : [...queued, formData]
       for (const entry of all) await saveEntry(entry)
       const count = all.length
-      Alert.alert('Success', editId ? 'Product updated' : `${count} product${count > 1 ? 's' : ''} created`, [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ])
+      showSuccess('Success', editId ? 'Product updated' : `${count} product${count > 1 ? 's' : ''} created`)
+      navigation.goBack()
     } catch (e: any) {
-      Alert.alert('Error', e.response?.data?.error || 'Failed to save product')
+      showError('Error', e.response?.data?.error || 'Failed to save product')
     } finally {
       setSaving(false)
     }

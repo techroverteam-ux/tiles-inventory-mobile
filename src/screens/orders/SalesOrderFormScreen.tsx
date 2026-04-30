@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
@@ -10,6 +10,7 @@ import { DatePickerField } from '../../components/common/DatePickerField'
 import { MainStackParamList } from '../../navigation/types'
 import { salesOrderService, productService, locationService, Product, Location } from '../../services/api/ApiServices'
 import { apiClient } from '../../services/api/ApiClient'
+import { useToast } from '../../context/ToastContext'
 
 type SalesOrderFormRouteProp = RouteProp<MainStackParamList, 'SalesOrderForm'>
 
@@ -32,6 +33,7 @@ const emptyEntry = (): OrderEntry => ({
 export const SalesOrderFormScreen: React.FC = () => {
   const { theme } = useTheme()
   const navigation = useNavigation()
+  const { showError, showSuccess } = useToast()
   const route = useRoute<SalesOrderFormRouteProp>()
   const { orderId, order } = route.params || {}
 
@@ -116,11 +118,16 @@ export const SalesOrderFormScreen: React.FC = () => {
       if (orderId) {
         await salesOrderService.updateSalesOrder(orderId, {
           orderNumber,
-          items: [{ productId: formData.productId, quantity: Number(formData.quantity), unitPrice: 0, totalPrice: 0, productName: '' }],
-          totalAmount: 0, orderDate: formData.soldDate || new Date().toISOString(),
-          customerId: '', customerName: '', status: 'DRAFT' as const,
+          productId: formData.productId,
+          locationId: formData.locationId,
+          batchId: formData.batchId,
+          batchName: formData.batchName || undefined,
+          quantity: Number(formData.quantity),
+          soldDate: formData.soldDate || new Date().toISOString(),
+          status: 'DRAFT' as const,
         })
-        Alert.alert('Success', 'Order updated', [{ text: 'OK', onPress: () => navigation.goBack() }])
+        showSuccess('Success', 'Order updated')
+        navigation.goBack()
       } else {
         let success = 0
         for (const entry of all) {
@@ -133,10 +140,11 @@ export const SalesOrderFormScreen: React.FC = () => {
           })
           success++
         }
-        Alert.alert('Success', `${success} order${success > 1 ? 's' : ''} created`, [{ text: 'OK', onPress: () => navigation.goBack() }])
+        showSuccess('Success', `${success} order${success > 1 ? 's' : ''} created`)
+        navigation.goBack()
       }
     } catch (e: any) {
-      Alert.alert('Error', e.response?.data?.error || 'Failed to save order')
+      showError('Error', e.response?.data?.error || 'Failed to save order')
     } finally {
       setSaving(false)
     }
@@ -155,7 +163,7 @@ export const SalesOrderFormScreen: React.FC = () => {
     backBtn: { padding: 4, marginBottom: 8 },
     pageTitle: { fontSize: 22, fontWeight: '700', color: theme.primary, marginBottom: 20 },
     orderNumRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-    orderNumText: {
+    orderNumInput: {
       flex: 1, borderWidth: 1, borderColor: theme.primary, borderRadius: 10,
       paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontWeight: '600',
       color: theme.primary, backgroundColor: theme.surface,
@@ -206,7 +214,14 @@ export const SalesOrderFormScreen: React.FC = () => {
 
         <Text style={s.sectionLabel}>Order Number</Text>
         <View style={s.orderNumRow}>
-          <Text style={s.orderNumText}>{orderNumber}</Text>
+          <TextInput
+            style={s.orderNumInput}
+            value={orderNumber}
+            onChangeText={setOrderNumber}
+            placeholder="Enter order number"
+            placeholderTextColor={theme.mutedForeground}
+            autoCapitalize="characters"
+          />
           <TouchableOpacity style={s.refreshBtn} onPress={() => setOrderNumber(generateOrderNumber())}>
             <Icon name="refresh" size={20} color={theme.mutedForeground} />
           </TouchableOpacity>

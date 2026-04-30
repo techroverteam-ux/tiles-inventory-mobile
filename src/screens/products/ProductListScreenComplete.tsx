@@ -23,12 +23,7 @@ import { ImagePreview } from '../../components/common/ImagePreview'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { productService, Product } from '../../services/api/ApiServices'
 import { exportToExcel, commonColumns } from '../../utils/exportUtils'
-
-const resolveImageUrl = (url?: string | null) => {
-  if (!url) return null
-  if (url.startsWith('http')) return url
-  return `https://tiles-inventory.vercel.app${url}`
-}
+import { resolvePublicUrl } from '../../config/appConfig'
 import { spacing, typography, borderRadius } from '../../theme'
 import { getCommonStyles } from '../../theme/commonStyles'
 
@@ -52,7 +47,7 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 20 // Standard limit
+  const [itemsPerPage, setItemsPerPage] = useState(5)
 
   useEffect(() => {
     loadProducts(1)
@@ -64,14 +59,15 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
     }, [])
   )
 
-  const loadProducts = async (page: number, q = search) => {
+  const loadProducts = async (page: number, q = search, pageSize = itemsPerPage) => {
     try {
       setLoading(true)
-      const response = await productService.getProducts(page, itemsPerPage, { search: q })
+      const limit = pageSize === 0 ? 1000 : pageSize
+      const response = await productService.getProducts(page, limit, { search: q })
       setProducts(response.products || [])
       const total = response.total || 0
       setTotalItems(total)
-      setTotalPages(Math.max(1, Math.ceil(total / itemsPerPage)))
+      setTotalPages(Math.max(1, Math.ceil(total / limit)))
       setCurrentPage(page)
     } catch (error) {
       showError('Error', 'Failed to load products')
@@ -93,6 +89,11 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
 
   const handlePageChange = (newPage: number) => {
     loadProducts(newPage)
+  }
+
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value)
+    loadProducts(1, search, value)
   }
 
   const handleDeleteProduct = (product: Product) => {
@@ -118,15 +119,27 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
     }
   }
 
-  const handleExportData = () => {
-    exportToExcel({
-      data: products,
-      columns: commonColumns.product,
-      filename: 'products_export',
-      reportTitle: 'Products Catalog Report',
-    }).then(success => {
-      if (success) showSuccess('Export', 'Excel file ready to share')
-    })
+  const handleExportData = async () => {
+    try {
+      const response = await productService.getProducts(1, 10000, { search })
+      const exportSource = response.products || []
+      const filteredProducts = exportSource.filter((p: any) => {
+        if (statusFilter === 'active') return p.isActive !== false
+        if (statusFilter === 'inactive') return p.isActive === false
+        return true
+      })
+
+      exportToExcel({
+        data: filteredProducts,
+        columns: commonColumns.product,
+        filename: 'products_export_filtered',
+        reportTitle: 'Filtered Products Catalog Report',
+      }).then(success => {
+        if (success) showSuccess('Export', 'Excel file ready to share')
+      })
+    } catch {
+      showError('Export Failed', 'Unable to load filtered products for export')
+    }
   }
 
   const [showFilters, setShowFilters] = useState(false)
@@ -139,6 +152,12 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
     loadProducts(1, search)
   }
 
+  const filteredProducts = products.filter((p: any) => {
+    if (statusFilter === 'active') return p.isActive !== false
+    if (statusFilter === 'inactive') return p.isActive === false
+    return true
+  })
+
   const renderProduct = ({ item }: { item: Product }) => {
     const stockQty = (item as any).totalStock ?? item.stock ?? 0
     const isOutOfStock = stockQty === 0
@@ -150,8 +169,8 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
       ]}>
         <View style={styles.imageContainer}>
           {item.imageUrl ? (
-            <TouchableOpacity onPress={() => setPreviewImage({ url: resolveImageUrl(item.imageUrl)!, name: item.name })}>
-              <Image source={{ uri: resolveImageUrl(item.imageUrl)! }} style={styles.image} />
+            <TouchableOpacity onPress={() => setPreviewImage({ url: resolvePublicUrl(item.imageUrl)!, name: item.name })}>
+              <Image source={{ uri: resolvePublicUrl(item.imageUrl)! }} style={styles.image} />
             </TouchableOpacity>
           ) : (
             <View style={styles.placeholderImage}>
@@ -237,7 +256,7 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
       >
         <View style={styles.colPhoto}>
           {item.imageUrl ? (
-            <Image source={{ uri: resolveImageUrl(item.imageUrl)! }} style={styles.rowImage} />
+            <Image source={{ uri: resolvePublicUrl(item.imageUrl)! }} style={styles.rowImage} />
           ) : (
             <View style={styles.rowPlaceholder}>
               <Icon name="image" size={16} color={theme.textSecondary} />
@@ -626,7 +645,7 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
       )}
       
       <FlatList
-        data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : products}
+        data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : filteredProducts}
         renderItem={loading ? renderSkeleton : renderItem}
         keyExtractor={(item, index) => loading ? `skel-${index}` : item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
@@ -634,12 +653,13 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={renderListHeader}
         ListFooterComponent={
-          !loading && products.length > 0 ? (
+          !loading && filteredProducts.length > 0 ? (
             <PaginationControl
               currentPage={currentPage}
               totalPages={totalPages}
-              totalItems={totalItems}
+              totalItems={filteredProducts.length}
               itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
               onPageChange={handlePageChange}
             />
           ) : null

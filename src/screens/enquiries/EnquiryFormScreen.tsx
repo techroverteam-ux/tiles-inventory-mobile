@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
 } from 'react-native'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
 import { useTheme } from '../../context/ThemeContext'
@@ -22,7 +21,7 @@ interface EnquiryFormRouteProp {
 
 export const EnquiryFormScreen: React.FC = () => {
   const { theme } = useTheme()
-  const { showToast } = useToast()
+  const { showToast, showSuccess } = useToast()
   const navigation = useNavigation()
   const route = useRoute<RouteProp<{ params: EnquiryFormRouteProp }, 'params'>>()
   const { productId, productName } = route.params || {}
@@ -120,12 +119,9 @@ export const EnquiryFormScreen: React.FC = () => {
       }
 
       await enquiryService.submitEnquiry(enquiryData)
-      
-      Alert.alert(
-        'Enquiry Submitted',
-        'Your enquiry has been submitted successfully. We will contact you soon.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      )
+
+      showSuccess('Enquiry Submitted', 'Your enquiry has been submitted successfully. We will contact you soon.')
+      navigation.goBack()
     } catch (error) {
       showToast('Failed to submit enquiry', 'error')
     } finally {

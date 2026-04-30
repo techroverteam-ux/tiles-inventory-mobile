@@ -166,7 +166,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
       
       const shareOptions = {
         title: title || 'Share Image',
-        message: title || 'Shared from Tiles Inventory App',
+        message: title || 'Shared from House Of Tiles App',
         url: imageUri,
         type: 'image/jpeg',
       }

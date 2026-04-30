@@ -52,7 +52,7 @@ export async function exportToCSV({
   columns,
   data,
   includeTimestamp = true,
-  companyName = 'Tiles Inventory Management System',
+  companyName = 'House Of Tiles',
   reportTitle = 'Data Export Report',
 }: ExportOptions): Promise<{ success: boolean; filename?: string; error?: string }> {
   try {
@@ -118,7 +118,7 @@ export async function exportToPDF({
   columns,
   data,
   includeTimestamp = true,
-  companyName = 'Tiles Inventory Management System',
+  companyName = 'House Of Tiles',
   reportTitle = 'Data Export Report',
 }: ExportOptions): Promise<{ success: boolean; filename?: string; error?: string }> {
   try {

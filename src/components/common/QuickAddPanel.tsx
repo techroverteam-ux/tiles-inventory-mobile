@@ -10,6 +10,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
 import { withOpacity } from '../../utils/colorUtils'
+import { navigationRef } from '../../navigation/navigationRef'
 
 interface QuickAction {
   title: string
@@ -21,28 +22,58 @@ interface QuickAction {
 
 const quickActions: QuickAction[] = [
   { title: 'Brand', subtitle: 'NEW PARTNER', icon: 'people', screen: 'BrandManagement' },
-  { title: 'Product', subtitle: 'NEW ITEM', icon: 'inventory-2', screen: 'Products', params: { screen: 'ProductForm' } },
-  { title: 'Stock', subtitle: 'ADD BATCH', icon: 'tag', screen: 'Inventory' },
+  { title: 'Product', subtitle: 'NEW ITEM', icon: 'inventory-2', screen: 'ProductForm' },
+  { title: 'Stock', subtitle: 'ADD BATCH', icon: 'tag', screen: 'StockUpdate', params: { productId: '' } },
   { title: 'Location', subtitle: 'WAREHOUSE', icon: 'location-on', screen: 'LocationManagement' },
-  { title: 'Purchase', subtitle: 'RESTOCK', icon: 'shopping-cart', screen: 'PurchaseOrders' },
-  { title: 'Sale', subtitle: 'CHECKOUT', icon: 'trending-up', screen: 'SalesOrders' },
+  { title: 'Purchase', subtitle: 'RESTOCK', icon: 'shopping-cart', screen: 'PurchaseOrderForm' },
+  { title: 'Sale', subtitle: 'CHECKOUT', icon: 'trending-up', screen: 'SalesOrderForm' },
 ]
 
-interface QuickAddPanelProps {
-  navigation: any
-}
-
-export const QuickAddPanel: React.FC<QuickAddPanelProps> = ({ navigation }) => {
+export const QuickAddPanel: React.FC = () => {
   const { theme } = useTheme()
   const [visible, setVisible] = useState(false)
 
   const handleAction = (action: QuickAction) => {
     setVisible(false)
     setTimeout(() => {
+      const drawerScreens = new Set(['BrandManagement', 'CategoryManagement', 'CollectionManagement', 'SizeManagement', 'LocationManagement', 'Notifications', 'Reports', 'AdminPanel', 'AdminFunctions', 'Settings'])
+
+      if (!navigationRef.isReady()) {
+        return
+      }
+
+      if (action.screen === 'StockUpdate') {
+        navigationRef.navigate('Main' as never, {
+          screen: 'Drawer',
+          params: {
+            screen: 'Tabs',
+            params: {
+              screen: 'InventoryTab',
+              params: {
+                screen: 'StockUpdate',
+                params: { productId: '' },
+              },
+            },
+          },
+        } as never)
+        return
+      }
+
+      if (drawerScreens.has(action.screen)) {
+        navigationRef.navigate('Main' as never, {
+          screen: 'Drawer',
+          params: { screen: action.screen },
+        } as never)
+        return
+      }
+
       if (action.params) {
-        navigation.navigate(action.screen, action.params)
+        navigationRef.navigate('Main' as never, {
+          screen: action.screen,
+          params: action.params,
+        } as never)
       } else {
-        navigation.navigate(action.screen)
+        navigationRef.navigate('Main' as never, { screen: action.screen } as never)
       }
     }, 200)
   }
@@ -107,11 +138,11 @@ export const QuickAddPanel: React.FC<QuickAddPanelProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
-    right: 20,
-    bottom: 80, // 64 (BottomNavBar height) + 16 (spacing)
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    right: 28,
+    bottom: 120,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 6,

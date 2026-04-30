@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   RefreshControl,
   TouchableOpacity,
   Image,
@@ -40,7 +39,7 @@ interface Product {
 
 export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route, navigation }) => {
   const { theme } = useTheme()
-  const { showToast } = useToast()
+  const { showToast, showError } = useToast()
   const { productId } = route.params || {}
   
   const [product, setProduct] = useState<Product | null>(null)
@@ -53,7 +52,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route,
 
   const loadProductDetails = async () => {
     if (!productId) {
-      Alert.alert('Error', 'Product ID is missing')
+      showError('Error', 'Product ID is missing')
       navigation.goBack()
       return
     }

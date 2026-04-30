@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   RefreshControl,
   Image,
 } from 'react-native'
@@ -25,7 +24,7 @@ interface BrandDetailScreenProps {
 
 export const BrandDetailScreen: React.FC<BrandDetailScreenProps> = ({ route, navigation }) => {
   const { theme } = useTheme()
-  const { showToast } = useToast()
+  const { showToast, showError } = useToast()
   const { brandId } = route.params || {}
   
   const [brand, setBrand] = useState<Brand | null>(null)
@@ -38,7 +37,7 @@ export const BrandDetailScreen: React.FC<BrandDetailScreenProps> = ({ route, nav
 
   const loadBrandDetails = async () => {
     if (!brandId) {
-      Alert.alert('Error', 'Brand ID is missing')
+      showError('Error', 'Brand ID is missing')
       navigation.goBack()
       return
     }

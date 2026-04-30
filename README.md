@@ -1,6 +1,6 @@
-# Tiles Inventory Mobile App
+# House Of Tiles Mobile App
 
-A comprehensive React Native mobile application for managing tiles inventory, built with TypeScript and modern React Native practices.
+A comprehensive React Native mobile application for managing House Of Tiles inventory, built with TypeScript and modern React Native practices.
 
 ## 🚀 Features
 

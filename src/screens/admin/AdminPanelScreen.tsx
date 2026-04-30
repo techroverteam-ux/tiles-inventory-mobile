@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -33,7 +32,7 @@ interface SystemStats {
 
 export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }) => {
   const { theme } = useTheme()
-  const { showToast, showSuccess, showError } = useToast()
+  const { showToast, showSuccess, showError, showWarning } = useToast()
   const [systemStats, setSystemStats] = useState<SystemStats>({
     totalUsers: 0,
     totalSessions: 0,
@@ -124,17 +123,15 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
   )
 
   const handleDatabaseCleanup = () => {
-    Alert.alert(
+    showWarning(
       'Database Cleanup',
-      'This will permanently delete all soft-deleted records. This action cannot be undone.\n\nAre you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Proceed',
-          style: 'destructive',
+      'This will permanently delete all soft-deleted records. This action cannot be undone. Are you sure?',
+      {
+        action: {
+          label: 'Proceed',
           onPress: performDatabaseCleanup,
         },
-      ]
+      }
     )
   }
 
@@ -169,28 +166,23 @@ export const AdminPanelScreen: React.FC<AdminPanelScreenProps> = ({ navigation }
   }
 
   const handleCacheReset = () => {
-    Alert.alert(
-      'Reset Cache',
-      'This will clear all cached data and may temporarily slow down the app.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          onPress: async () => {
-            setOperationLoading('cache')
-            try {
-              const { SecureStorage } = await import('../../services/storage/SecureStorage')
-              // Clear non-auth cache keys if any
-              showSuccess('Cache reset successfully')
-            } catch (error) {
-              showError('Cache reset failed')
-            } finally {
-              setOperationLoading(null)
-            }
-          },
+    showWarning('Reset Cache', 'This will clear all cached data and may temporarily slow down the app.', {
+      action: {
+        label: 'Reset',
+        onPress: async () => {
+          setOperationLoading('cache')
+          try {
+            const { SecureStorage } = await import('../../services/storage/SecureStorage')
+            // Clear non-auth cache keys if any
+            showSuccess('Cache reset successfully')
+          } catch (error) {
+            showError('Cache reset failed')
+          } finally {
+            setOperationLoading(null)
+          }
         },
-      ]
-    )
+      },
+    })
   }
 
   const styles = StyleSheet.create({

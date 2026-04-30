@@ -5,10 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '../../context/ThemeContext'
+import { useToast } from '../../context/ToastContext'
 import { Header } from '../../components/navigation/Header'
 import { Card } from '../../components/common/Card'
 import { TextInput } from '../../components/common/TextInput'
@@ -22,6 +22,7 @@ interface OrderFormScreenProps {
 
 export const OrderFormScreen: React.FC<OrderFormScreenProps> = ({ navigation, route }) => {
   const { theme } = useTheme()
+  const { showError, showSuccess } = useToast()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     customerName: '',
@@ -33,17 +34,17 @@ export const OrderFormScreen: React.FC<OrderFormScreenProps> = ({ navigation, ro
 
   const handleSubmit = async () => {
     if (!formData.customerName.trim()) {
-      Alert.alert('Error', 'Customer name is required')
+      showError('Error', 'Customer name is required')
       return
     }
 
     setLoading(true)
     try {
       // TODO: Implement order creation logic
-      Alert.alert('Success', 'Order created successfully')
+      showSuccess('Success', 'Order created successfully')
       navigation.goBack()
     } catch (error) {
-      Alert.alert('Error', 'Failed to create order')
+      showError('Error', 'Failed to create order')
     } finally {
       setLoading(false)
     }

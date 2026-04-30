@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   RefreshControl,
   SafeAreaView,
 } from 'react-native'
@@ -27,7 +26,7 @@ interface CollectionManagementScreenProps {
 
 export const CollectionManagementScreen: React.FC<CollectionManagementScreenProps> = ({ navigation }) => {
   const { theme } = useTheme()
-  const { showToast } = useToast()
+  const { showToast, showWarning } = useToast()
   const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -234,18 +233,12 @@ export const CollectionManagementScreen: React.FC<CollectionManagementScreenProp
   }
 
   const handleDelete = (collection: Collection) => {
-    Alert.alert(
-      'Delete Collection',
-      `Are you sure you want to delete "${collection.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteCollection(collection.id),
-        },
-      ]
-    )
+    showWarning('Delete Collection', `Are you sure you want to delete "${collection.name}"?`, {
+      action: {
+        label: 'Delete',
+        onPress: () => deleteCollection(collection.id),
+      },
+    })
   }
 
   const deleteCollection = async (id: string) => {
@@ -380,14 +373,7 @@ export const CollectionManagementScreen: React.FC<CollectionManagementScreenProp
         />
       </View>
 
-      {!showAddForm && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => setShowAddForm(true)}
-        >
-          <Icon name="add" size={24} color={theme.textInverse} />
-        </TouchableOpacity>
-      )}
+      {/* local FAB removed in favor of global QuickAddPanel */}
     </SafeAreaView>
   )
 }

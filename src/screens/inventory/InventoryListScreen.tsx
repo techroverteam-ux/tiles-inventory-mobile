@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import {
   View, Text, FlatList, StyleSheet, RefreshControl,
-  TouchableOpacity, Image, Alert, Modal, ScrollView, TextInput as RNTextInput,
+  TouchableOpacity, Image, Modal, ScrollView, TextInput as RNTextInput,
 } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -18,12 +18,7 @@ import { getCommonStyles } from '../../theme/commonStyles'
 import { InventoryNavigationProp } from '../../navigation/types'
 import { inventoryService, Batch } from '../../services/api/ApiServices'
 import { withOpacity } from '../../utils/colorUtils'
-
-const resolveImageUrl = (url?: string | null) => {
-  if (!url) return null
-  if (url.startsWith('http')) return url
-  return `https://tiles-inventory.vercel.app${url}`
-}
+import { resolvePublicUrl } from '../../config/appConfig'
 
 export const InventoryListScreen: React.FC = () => {
   const { theme } = useTheme()
@@ -36,26 +31,29 @@ export const InventoryListScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [search, setSearch] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [stockFilter, setStockFilter] = useState<'all' | 'in' | 'low' | 'out'>('all')
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 20
+  const [itemsPerPage, setItemsPerPage] = useState(5)
 
   // Edit modal
   const [editBatch, setEditBatch] = useState<Batch | null>(null)
   const [editForm, setEditForm] = useState({ batchNumber: '', quantity: '', purchasePrice: '', sellingPrice: '' })
   const [saving, setSaving] = useState(false)
 
-  const fetchInventory = useCallback(async (page: number, q = search) => {
+  const fetchInventory = useCallback(async (page: number, q = search, pageSize = itemsPerPage) => {
     try {
       setLoading(true)
-      const response = await inventoryService.getInventory({ page, limit: itemsPerPage, search: q })
+      const limit = pageSize === 0 ? 1000 : pageSize
+      const response = await inventoryService.getInventory({ page, limit, search: q })
       setInventory(response.inventory || [])
       const total = response.pagination?.total || 0
       setTotalItems(total)
-      setTotalPages(Math.max(1, Math.ceil(total / itemsPerPage)))
+      setTotalPages(Math.max(1, Math.ceil(total / limit)))
       setCurrentPage(page)
     } catch {
       showError('Error', 'Failed to fetch inventory data')
@@ -68,6 +66,11 @@ export const InventoryListScreen: React.FC = () => {
   const handleSearch = (q: string) => {
     setSearch(q)
     fetchInventory(1, q)
+  }
+
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value)
+    fetchInventory(1, search, value)
   }
 
   useFocusEffect(useCallback(() => { fetchInventory(1) }, [fetchInventory]))
@@ -105,14 +108,12 @@ export const InventoryListScreen: React.FC = () => {
   }
 
   const handleDelete = (batch: Batch) => {
-    Alert.alert(
+    showWarning(
       'Delete Batch',
       `Delete batch ${batch.batchNumber || batch.id}? This will also remove related records.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
+      {
+        action: {
+          label: 'Delete',
           onPress: async () => {
             try {
               await inventoryService.deleteInventory(batch.id)
@@ -122,17 +123,37 @@ export const InventoryListScreen: React.FC = () => {
             } catch {
               showError('Error', 'Failed to delete batch')
             }
-          },
-        },
-      ]
+          }
+        }
+      }
     )
   }
 
-  const handleExportData = () => {
-    import('../../utils/exportUtils').then(({ exportToExcel, commonColumns }) => {
-      exportToExcel({ data: inventory, columns: commonColumns.inventory, filename: 'inventory_export', reportTitle: 'Inventory Stock Report' })
-        .then(success => { if (success) showSuccess('Export', 'Excel file ready to share') })
-    })
+  const filteredInventory = inventory.filter((item) => {
+    if (stockFilter === 'low') return item.quantity > 0 && item.quantity < 10
+    if (stockFilter === 'out') return item.quantity === 0
+    if (stockFilter === 'in') return item.quantity >= 10
+    return true
+  })
+
+  const handleExportFiltered = async () => {
+    try {
+      const response = await inventoryService.getInventory({ page: 1, limit: 10000, search })
+      const allInventory = response.inventory || []
+      const filteredForExport = allInventory.filter((item) => {
+        if (stockFilter === 'low') return item.quantity > 0 && item.quantity < 10
+        if (stockFilter === 'out') return item.quantity === 0
+        if (stockFilter === 'in') return item.quantity >= 10
+        return true
+      })
+
+      import('../../utils/exportUtils').then(({ exportToExcel, commonColumns }) => {
+        exportToExcel({ data: filteredForExport, columns: commonColumns.inventory, filename: 'inventory_export_filtered', reportTitle: 'Filtered Inventory Stock Report' })
+          .then(success => { if (success) showSuccess('Export', 'Excel file ready to share') })
+      })
+    } catch {
+      showError('Export Failed', 'Unable to load filtered inventory for export')
+    }
   }
 
   const s = StyleSheet.create({
@@ -190,7 +211,7 @@ export const InventoryListScreen: React.FC = () => {
     <Card style={[commonStyles.glassCard, s.inventoryCard, viewMode === 'grid' && s.gridCard]}>
       <View style={s.imageContainer}>
         {batch.product.imageUrl ? (
-          <Image source={{ uri: resolveImageUrl(batch.product.imageUrl)! }} style={s.image} />
+          <Image source={{ uri: resolvePublicUrl(batch.product.imageUrl)! }} style={s.image} />
         ) : (
           <View style={s.placeholderImage}>
             <Icon name="image" size={48} color={theme.textSecondary} />
@@ -233,7 +254,7 @@ export const InventoryListScreen: React.FC = () => {
     <TouchableOpacity style={s.tableRow} onPress={() => handleEdit(batch)} activeOpacity={0.7}>
       <View style={s.colPhoto}>
         {batch.product.imageUrl ? (
-          <Image source={{ uri: resolveImageUrl(batch.product.imageUrl)! }} style={s.rowImage} />
+          <Image source={{ uri: resolvePublicUrl(batch.product.imageUrl)! }} style={s.rowImage} />
         ) : (
           <View style={s.rowPlaceholder}><Icon name="image" size={16} color={theme.textSecondary} /></View>
         )}
@@ -302,8 +323,8 @@ export const InventoryListScreen: React.FC = () => {
         itemCount={totalItems}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
-        onExport={handleExportData}
-        onToggleFilters={() => showWarning('Filters', 'Advanced filtering coming soon.')}
+        onExport={handleExportFiltered}
+        onToggleFilters={() => setShowFilters(v => !v)}
       />
       {/* Search bar */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
@@ -325,8 +346,38 @@ export const InventoryListScreen: React.FC = () => {
         </View>
       </View>
 
+      {showFilters && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {([
+                { key: 'all', label: 'All' },
+                { key: 'in', label: 'In Stock' },
+                { key: 'low', label: 'Low Stock' },
+                { key: 'out', label: 'Out of Stock' },
+              ] as const).map((f) => (
+                <TouchableOpacity
+                  key={f.key}
+                  onPress={() => setStockFilter(f.key)}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: stockFilter === f.key ? theme.primary : theme.border,
+                    backgroundColor: stockFilter === f.key ? theme.primary : theme.surface,
+                    borderRadius: 999,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                  }}
+                >
+                  <Text style={{ color: stockFilter === f.key ? theme.primaryForeground : theme.text, fontWeight: '700', fontSize: 12 }}>{f.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      )}
+
       <FlatList
-        data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : inventory}
+        data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : filteredInventory}
         renderItem={loading ? renderSkeleton : renderItem}
         keyExtractor={(item, index) => loading ? `skel-${index}` : item.id}
         contentContainerStyle={s.listContainer}
@@ -334,21 +385,20 @@ export const InventoryListScreen: React.FC = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListHeaderComponent={renderListHeader}
         ListFooterComponent={
-          !loading && inventory.length > 0 ? (
+          !loading && filteredInventory.length > 0 ? (
             <PaginationControl
               currentPage={currentPage}
               totalPages={totalPages}
-              totalItems={totalItems}
+              totalItems={filteredInventory.length}
               itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
               onPageChange={p => fetchInventory(p)}
             />
           ) : null
         }
       />
 
-      <TouchableOpacity style={s.fab} onPress={() => navigation.navigate('StockUpdate', { productId: '' })}>
-        <Icon name="add" size={24} color={theme.textInverse} />
-      </TouchableOpacity>
+      {/* global QuickAddPanel provides FAB - removed local FAB */}
 
       {/* Inline Edit Modal */}
       <Modal visible={!!editBatch} transparent animationType="slide" onRequestClose={() => setEditBatch(null)}>
