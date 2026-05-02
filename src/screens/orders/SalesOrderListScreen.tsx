@@ -16,14 +16,15 @@ import { useToast } from '../../context/ToastContext'
 import { MainHeader } from '../../components/navigation/MainHeader'
 import { ScreenActionBar } from '../../components/common/ScreenActionBar'
 import { PaginationControl } from '../../components/common/PaginationControl'
+import { DownloadCompletionModal } from '../../components/common/DownloadCompletionModal'
 import { getCommonStyles } from '../../theme/commonStyles'
 import { Card } from '../../components/common/Card'
 import { LoadingButton } from '../../components/common/LoadingButton'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { salesOrderService, SalesOrder } from '../../services/api/ApiServices'
-import { exportToExcel } from '../../utils/exportUtils'
 import { spacing, typography } from '../../theme'
 import { withOpacity } from '../../utils/colorUtils'
+import { useExportWithModal } from '../../hooks/useExportWithModal'
 
 interface SalesOrderListScreenProps {
   navigation: any
@@ -32,6 +33,7 @@ interface SalesOrderListScreenProps {
 export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navigation }) => {
   const { theme } = useTheme()
   const { showSuccess, showError, showWarning } = useToast()
+  const { modalState, closeModal, exportToExcelWithModal } = useExportWithModal()
   const [orders, setOrders] = useState<SalesOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -103,20 +105,19 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
       const response = await salesOrderService.getSalesOrders(1, 10000)
       const allOrders = response.salesOrders || []
       const filteredForExport = allOrders.filter(order => filter === 'ALL' || order.status === filter)
-
-      exportToExcel({
+      await exportToExcelWithModal({
         data: filteredForExport,
         columns: [
           { key: 'orderNumber', label: 'Order #' },
           { key: 'status', label: 'Status' },
-          { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${Number(v).toLocaleString()}` },
-          { key: 'orderDate', label: 'Order Date', format: (v: string) => new Date(v).toLocaleDateString() },
+          { key: 'totalAmount', label: 'Amount' },
+          { key: 'orderDate', label: 'Order Date' },
         ],
-        filename: 'sales_orders_export_filtered',
-        reportTitle: 'Filtered Sales Orders Report',
-      }).then(ok => { if (ok) showSuccess('Export', 'Excel file ready to share') })
+        filename: 'sales_orders_export',
+        reportTitle: 'Sales Orders Report',
+      })
     } catch {
-      showError('Export Failed', 'Unable to load filtered sales orders for export')
+      showError('Export Failed', 'Unable to load sales orders for export')
     }
   }
 
@@ -485,6 +486,13 @@ export const SalesOrderListScreen: React.FC<SalesOrderListScreenProps> = ({ navi
       </View>
 
       {/* global QuickAddPanel provides FAB - removed local FAB */}
+      <DownloadCompletionModal
+        visible={modalState.visible}
+        filename={modalState.filename}
+        filepath={modalState.filepath}
+        filesize={modalState.filesize}
+        onClose={closeModal}
+      />
     </SafeAreaView>
   )
 }

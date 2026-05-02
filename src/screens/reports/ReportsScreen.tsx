@@ -9,6 +9,8 @@ import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
 import { MainHeader } from '../../components/navigation/MainHeader'
 import { Card } from '../../components/common/Card'
+import { DownloadCompletionModal } from '../../components/common/DownloadCompletionModal'
+import { useExportWithModal } from '../../hooks/useExportWithModal'
 import { apiClient } from '../../services/api/ApiClient'
 import { getCommonStyles } from '../../theme/commonStyles'
 import { spacing, typography } from '../../theme'
@@ -55,6 +57,7 @@ export const ReportsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const [refreshing, setRefreshing] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [designStockData, setDesignStockData] = useState<DesignStockReport | null>(null)
+  const { modalState, closeModal, exportToExcelWithModal } = useExportWithModal()
   const commonStyles = getCommonStyles(theme)
 
   const loadReport = useCallback(async (type: ReportType) => {
@@ -85,7 +88,30 @@ export const ReportsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   }
 
   const handleExport = () => {
-    showSuccess('Export', 'Use the web portal to export reports as Excel/PDF')
+    ;(async () => {
+      try {
+        if (activeReport === 'design-stock') {
+          if (!designStockData) { showError('Export', 'No data to export'); return }
+          const rows = designStockData.brands.flatMap(b => b.items.map(it => ({ brand: b.brandName, ...it })))
+          const columns = [
+            { key: 'brand', label: 'Brand' },
+            { key: 'productCode', label: 'Product Code' },
+            { key: 'productName', label: 'Product Name' },
+            { key: 'size', label: 'Size' },
+            { key: 'quantity', label: 'Quantity' },
+            { key: 'location', label: 'Location' },
+          ]
+          await exportToExcelWithModal({ data: rows, columns, filename: 'design_stock_report', reportTitle: 'Design Stock Report' })
+        } else {
+          if (!reportData) { showError('Export', 'No report data to export'); return }
+          const columns = reportData.columns.map(c => ({ key: c.key, label: c.label }))
+          const rows = reportData.rows
+          await exportToExcelWithModal({ data: rows, columns, filename: `${activeReport}_report`, reportTitle: `${activeReport.charAt(0).toUpperCase() + activeReport.slice(1)} Report` })
+        }
+      } catch (e) {
+        showError('Export', 'Failed to generate report for export')
+      }
+    })()
   }
 
   const s = StyleSheet.create({
@@ -296,6 +322,13 @@ export const ReportsScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
           )}
         </View>
       </ScrollView>
+      <DownloadCompletionModal
+        visible={modalState.visible}
+        filename={modalState.filename}
+        filepath={modalState.filepath}
+        filesize={modalState.filesize}
+        onClose={closeModal}
+      />
     </SafeAreaView>
   )
 }

@@ -9,6 +9,8 @@ import {
 } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import { useTheme } from '../../context/ThemeContext'
+import { DownloadCompletionModal } from './DownloadCompletionModal'
+import { useExportWithModal } from '../../hooks/useExportWithModal'
 import { 
   exportToCSV, 
   exportToPDF, 
@@ -41,6 +43,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
 }) => {
   const { theme } = useTheme()
   const [loading, setLoading] = useState(false)
+  const { modalState, closeModal, exportToExcelWithModal } = useExportWithModal()
 
   const handleExport = () => {
     if (data.length === 0) {
@@ -92,7 +95,22 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
       }
     }
 
-    showExportAlert(handleCSVExport, handlePDFExport)
+    const handleExcelExport = async () => {
+      setLoading(true)
+      if (onExportStart) onExportStart()
+
+      await exportToExcelWithModal({
+        filename,
+        columns,
+        data,
+        includeTimestamp: true,
+        reportTitle: reportTitle || `${filename.charAt(0).toUpperCase() + filename.slice(1)} Report`,
+      })
+
+      setLoading(false)
+    }
+
+    showExportAlert(handleCSVExport, handlePDFExport, handleExcelExport)
   }
 
   const getButtonStyle = () => {
@@ -170,21 +188,30 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
   const iconSize = size === 'sm' ? 18 : size === 'lg' ? 22 : 20
 
   return (
-    <TouchableOpacity
-      style={getButtonStyle()}
-      onPress={handleExport}
-      disabled={disabled || loading || data.length === 0}
-      activeOpacity={0.7}
-    >
-      {loading ? (
-        <ActivityIndicator size="small" color={getIconColor()} />
-      ) : (
-        <Icon name="file-download" size={iconSize} color={getIconColor()} />
-      )}
-      <Text style={getTextStyle()}>
-        {loading ? 'Exporting...' : 'Export'}
-      </Text>
-    </TouchableOpacity>
+    <>
+      <TouchableOpacity
+        style={getButtonStyle()}
+        onPress={handleExport}
+        disabled={disabled || loading || data.length === 0}
+        activeOpacity={0.7}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color={getIconColor()} />
+        ) : (
+          <Icon name="file-download" size={iconSize} color={getIconColor()} />
+        )}
+        <Text style={getTextStyle()}>
+          {loading ? 'Exporting...' : 'Export'}
+        </Text>
+      </TouchableOpacity>
+      <DownloadCompletionModal
+        visible={modalState.visible}
+        filename={modalState.filename}
+        filepath={modalState.filepath}
+        filesize={modalState.filesize}
+        onClose={closeModal}
+      />
+    </>
   )
 }
 
@@ -242,6 +269,65 @@ export const CSVExportButton: React.FC<Omit<ExportButtonProps, 'variant'>> = (pr
         {loading ? 'Exporting...' : 'CSV'}
       </Text>
     </TouchableOpacity>
+  )
+}
+
+export const ExcelExportButton: React.FC<Omit<ExportButtonProps, 'variant'>> = (props) => {
+  const { theme } = useTheme()
+  const [loading, setLoading] = useState(false)
+  const { modalState, closeModal, exportToExcelWithModal } = useExportWithModal()
+
+  const handleExport = async () => {
+    if (props.data.length === 0) {
+      Alert.alert('No Data', 'There is no data to export.')
+      return
+    }
+
+    setLoading(true)
+    if (props.onExportStart) props.onExportStart()
+
+    await exportToExcelWithModal({
+      filename: props.filename || 'export',
+      columns: props.columns,
+      data: props.data,
+      includeTimestamp: true,
+      reportTitle: props.reportTitle || `${(props.filename || 'export').charAt(0).toUpperCase() + (props.filename || 'export').slice(1)} Report`,
+    })
+
+    setLoading(false)
+  }
+
+  return (
+    <>
+      <TouchableOpacity
+        style={[
+          styles.quickButton,
+          { 
+            backgroundColor: theme.primary,
+            opacity: props.disabled || loading || props.data.length === 0 ? 0.6 : 1 
+          }
+        ]}
+        onPress={handleExport}
+        disabled={props.disabled || loading || props.data.length === 0}
+        activeOpacity={0.7}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color={theme.primaryForeground} />
+        ) : (
+          <Icon name="file-download" size={18} color={theme.primaryForeground} />
+        )}
+        <Text style={[styles.quickButtonText, { color: theme.primaryForeground }]}> 
+          {loading ? 'Exporting...' : 'Excel'}
+        </Text>
+      </TouchableOpacity>
+      <DownloadCompletionModal
+        visible={modalState.visible}
+        filename={modalState.filename}
+        filepath={modalState.filepath}
+        filesize={modalState.filesize}
+        onClose={closeModal}
+      />
+    </>
   )
 }
 

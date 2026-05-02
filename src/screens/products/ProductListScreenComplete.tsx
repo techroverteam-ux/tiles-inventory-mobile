@@ -18,14 +18,15 @@ import { useToast } from '../../context/ToastContext'
 import { MainHeader } from '../../components/navigation/MainHeader'
 import { ScreenActionBar } from '../../components/common/ScreenActionBar'
 import { PaginationControl } from '../../components/common/PaginationControl'
+import { DownloadCompletionModal } from '../../components/common/DownloadCompletionModal'
 import { Card } from '../../components/common/Card'
 import { ImagePreview } from '../../components/common/ImagePreview'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { productService, Product } from '../../services/api/ApiServices'
-import { exportToExcel, commonColumns } from '../../utils/exportUtils'
 import { resolvePublicUrl } from '../../config/appConfig'
 import { spacing, typography, borderRadius } from '../../theme'
 import { getCommonStyles } from '../../theme/commonStyles'
+import { useExportWithModal } from '../../hooks/useExportWithModal'
 
 interface ProductListScreenProps {
   navigation: any
@@ -34,6 +35,7 @@ interface ProductListScreenProps {
 export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation }) => {
   const { theme } = useTheme()
   const { showError, showSuccess, showWarning } = useToast()
+  const { modalState, closeModal, exportToExcelWithModal } = useExportWithModal()
   const commonStyles = getCommonStyles(theme)
 
   const [products, setProducts] = useState<Product[]>([])
@@ -129,16 +131,19 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
         return true
       })
 
-      exportToExcel({
+      await exportToExcelWithModal({
         data: filteredProducts,
-        columns: commonColumns.product,
-        filename: 'products_export_filtered',
-        reportTitle: 'Filtered Products Catalog Report',
-      }).then(success => {
-        if (success) showSuccess('Export', 'Excel file ready to share')
+        columns: [
+          { key: 'productCode', label: 'Product Code' },
+          { key: 'productName', label: 'Product Name' },
+          { key: 'category.name', label: 'Category' },
+          { key: 'isActive', label: 'Status' },
+        ],
+        filename: 'products_export',
+        reportTitle: 'Products Catalog Report',
       })
     } catch {
-      showError('Export Failed', 'Unable to load filtered products for export')
+      showError('Export Failed', 'Unable to load products for export')
     }
   }
 
@@ -670,6 +675,13 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
         visible={!!previewImage}
         imageUrl={previewImage?.url || null}
         onClose={() => setPreviewImage(null)}
+      />
+      <DownloadCompletionModal
+        visible={modalState.visible}
+        filename={modalState.filename}
+        filepath={modalState.filepath}
+        filesize={modalState.filesize}
+        onClose={closeModal}
       />
     </SafeAreaView>
   )

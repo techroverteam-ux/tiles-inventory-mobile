@@ -1,6 +1,7 @@
 import RNFS from 'react-native-fs'
 import Share from 'react-native-share'
 import { Alert, Platform } from 'react-native'
+import { exportToExcel as utilsExportToExcel } from '../utils/exportUtils'
 
 export interface ExportColumn {
   key: string
@@ -346,15 +347,18 @@ export const commonColumns = {
 }
 
 // Export utility functions
-export const showExportAlert = (onCSV: () => void, onPDF: () => void) => {
-  Alert.alert(
-    'Export Data',
-    'Choose export format:',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'CSV', onPress: onCSV },
-      { text: 'PDF', onPress: onPDF },
-    ],
-    { cancelable: true }
-  )
+export async function exportToExcel(options: ExportOptions): Promise<{ success: boolean; filename?: string; error?: string }> {
+  return utilsExportToExcel(options as any)
+}
+
+export const showExportAlert = (onCSV: () => void, onPDF: () => void, onExcel?: () => void) => {
+  const buttons: any[] = [
+    { text: 'Cancel', style: 'cancel' },
+  ]
+
+  if (onExcel) buttons.push({ text: 'Excel', onPress: onExcel })
+  buttons.push({ text: 'CSV', onPress: onCSV })
+  buttons.push({ text: 'PDF', onPress: onPDF })
+
+  Alert.alert('Export Data', 'Choose export format:', buttons, { cancelable: true })
 }

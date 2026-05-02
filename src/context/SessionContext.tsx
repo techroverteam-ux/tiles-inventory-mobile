@@ -166,10 +166,12 @@ export const SessionProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Initialize session on mount - simplified to prevent memory leaks
   useEffect(() => {
     let isMounted = true
+    const SPLASH_MIN_DURATION = 3000 // 3 seconds minimum
     
     const initializeSession = async () => {
       try {
         setIsLoading(true)
+        const startTime = Date.now()
         
         // Check if we have stored authentication data
         const authFlag = await SecureStorage.getAuthToken()
@@ -191,6 +193,12 @@ export const SessionProvider: React.FC<{ children: ReactNode }> = ({ children })
               resetIdleTimer()
             }
           }
+        }
+        
+        // Enforce minimum splash screen duration (3 seconds)
+        const elapsedTime = Date.now() - startTime
+        if (elapsedTime < SPLASH_MIN_DURATION) {
+          await new Promise(resolve => setTimeout(resolve, SPLASH_MIN_DURATION - elapsedTime))
         }
         
       } catch (error) {

@@ -16,12 +16,13 @@ import { useToast } from '../../context/ToastContext'
 import { MainHeader } from '../../components/navigation/MainHeader'
 import { ScreenActionBar } from '../../components/common/ScreenActionBar'
 import { PaginationControl } from '../../components/common/PaginationControl'
+import { DownloadCompletionModal } from '../../components/common/DownloadCompletionModal'
 import { getCommonStyles } from '../../theme/commonStyles'
 import { Card } from '../../components/common/Card'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { purchaseOrderService, PurchaseOrder } from '../../services/api/ApiServices'
-import { exportToExcel } from '../../utils/exportUtils'
 import { spacing, typography } from '../../theme'
+import { useExportWithModal } from '../../hooks/useExportWithModal'
 
 interface PurchaseOrderListScreenProps {
   navigation: any
@@ -30,6 +31,7 @@ interface PurchaseOrderListScreenProps {
 export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = ({ navigation }) => {
   const { theme } = useTheme()
   const { showSuccess, showError, showWarning } = useToast()
+  const { modalState, closeModal, exportToExcelWithModal } = useExportWithModal()
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -106,21 +108,19 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
       const response = await purchaseOrderService.getPurchaseOrders(1, 10000)
       const allOrders = response.purchaseOrders || []
       const filteredForExport = allOrders.filter(order => filter === 'ALL' || order.status === filter)
-
-      exportToExcel({
+      await exportToExcelWithModal({
         data: filteredForExport,
         columns: [
           { key: 'orderNumber', label: 'Order #' },
-          { key: 'brand.name', label: 'Brand', format: (v: any) => v || (orders[0] as any)?.supplierName || 'N/A' },
           { key: 'status', label: 'Status' },
-          { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${Number(v).toLocaleString()}` },
-          { key: 'orderDate', label: 'Order Date', format: (v: string) => new Date(v).toLocaleDateString() },
+          { key: 'totalAmount', label: 'Amount' },
+          { key: 'orderDate', label: 'Order Date' },
         ],
-        filename: 'purchase_orders_export_filtered',
-        reportTitle: 'Filtered Purchase Orders Report',
-      }).then(ok => { if (ok) showSuccess('Export', 'Excel file ready to share') })
+        filename: 'purchase_orders_export',
+        reportTitle: 'Purchase Orders Report',
+      })
     } catch {
-      showError('Export Failed', 'Unable to load filtered purchase orders for export')
+      showError('Export Failed', 'Unable to load purchase orders for export')
     }
   }
 
@@ -303,6 +303,13 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
       </View>
 
       {/* global QuickAddPanel provides FAB - removed local FAB */}
+      <DownloadCompletionModal
+        visible={modalState.visible}
+        filename={modalState.filename}
+        filepath={modalState.filepath}
+        filesize={modalState.filesize}
+        onClose={closeModal}
+      />
     </SafeAreaView>
   )
 }

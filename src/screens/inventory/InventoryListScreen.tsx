@@ -11,6 +11,7 @@ import { useToast } from '../../context/ToastContext'
 import { MainHeader } from '../../components/navigation/MainHeader'
 import { ScreenActionBar } from '../../components/common/ScreenActionBar'
 import { PaginationControl } from '../../components/common/PaginationControl'
+import { DownloadCompletionModal } from '../../components/common/DownloadCompletionModal'
 import { Card } from '../../components/common/Card'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { spacing } from '../../theme'
@@ -19,11 +20,13 @@ import { InventoryNavigationProp } from '../../navigation/types'
 import { inventoryService, Batch } from '../../services/api/ApiServices'
 import { withOpacity } from '../../utils/colorUtils'
 import { resolvePublicUrl } from '../../config/appConfig'
+import { useExportWithModal } from '../../hooks/useExportWithModal'
 
 export const InventoryListScreen: React.FC = () => {
   const { theme } = useTheme()
   const navigation = useNavigation<InventoryNavigationProp>()
   const { showWarning, showSuccess, showError } = useToast()
+  const { modalState, closeModal, exportToExcelWithModal } = useExportWithModal()
   const commonStyles = getCommonStyles(theme)
 
   const [inventory, setInventory] = useState<Batch[]>([])
@@ -146,13 +149,21 @@ export const InventoryListScreen: React.FC = () => {
         if (stockFilter === 'in') return item.quantity >= 10
         return true
       })
-
-      import('../../utils/exportUtils').then(({ exportToExcel, commonColumns }) => {
-        exportToExcel({ data: filteredForExport, columns: commonColumns.inventory, filename: 'inventory_export_filtered', reportTitle: 'Filtered Inventory Stock Report' })
-          .then(success => { if (success) showSuccess('Export', 'Excel file ready to share') })
+      await exportToExcelWithModal({
+        data: filteredForExport,
+        columns: [
+          { key: 'batchNumber', label: 'Batch #' },
+          { key: 'productCode', label: 'Product Code' },
+          { key: 'productName', label: 'Product Name' },
+          { key: 'quantity', label: 'Quantity' },
+          { key: 'purchasePrice', label: 'Purchase Price' },
+          { key: 'sellingPrice', label: 'Selling Price' },
+        ],
+        filename: 'inventory_export',
+        reportTitle: 'Inventory Stock Report',
       })
     } catch {
-      showError('Export Failed', 'Unable to load filtered inventory for export')
+      showError('Export Failed', 'Unable to load inventory for export')
     }
   }
 
@@ -455,6 +466,13 @@ export const InventoryListScreen: React.FC = () => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      <DownloadCompletionModal
+        visible={modalState.visible}
+        filename={modalState.filename}
+        filepath={modalState.filepath}
+        filesize={modalState.filesize}
+        onClose={closeModal}
+      />
     </SafeAreaView>
   )
 }
