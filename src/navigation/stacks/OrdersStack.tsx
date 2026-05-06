@@ -8,42 +8,54 @@ import { SalesOrderDetailScreen } from '../../screens/orders/SalesOrderDetailScr
 import { Header } from '../../components/navigation/Header'
 import { OrdersStackParamList } from '../types'
 
-const Stack = createStackNavigator<OrdersStackParamList>()
+const PurchaseStack = createStackNavigator<OrdersStackParamList>()
+const SalesStack = createStackNavigator<OrdersStackParamList>()
 
-export const OrdersStack: React.FC<any> = (props) => {
+export const PurchaseOrdersStack: React.FC<any> = () => {
   const { theme } = useTheme()
-
   return (
-    <Stack.Navigator
-      id="OrdersStack"
+    <PurchaseStack.Navigator
+      id="PurchaseOrdersStack"
       screenOptions={{
         header: (props: any) => <Header {...props} />,
         cardStyle: { backgroundColor: theme.background }
       }}
     >
-      <Stack.Screen 
-        name="OrderList" 
+      <PurchaseStack.Screen
+        name="OrderList"
         component={OrderListScreen}
         options={{ headerShown: false }}
-        initialParams={{ orderType: (props as any)?.route?.params?.orderType || 'purchase' }}
+        initialParams={{ orderType: 'purchase' }}
       />
-      <Stack.Screen 
-        name="OrderDetail" 
-        component={OrderDetailScreen}
-        options={{ title: 'Order Details' }}
-      />
-      <Stack.Screen
-        name="PurchaseOrderDetail"
-        component={PurchaseOrderDetailScreen}
-        initialParams={{ orderType: 'purchase' } as any}
-        options={{ title: 'Purchase Order Details' }}
-      />
-      <Stack.Screen
-        name="SalesOrderDetail"
-        component={SalesOrderDetailScreen}
-        initialParams={{ orderType: 'sales' } as any}
-        options={{ title: 'Sales Order Details' }}
-      />
-    </Stack.Navigator>
+      <PurchaseStack.Screen name="OrderDetail" component={OrderDetailScreen} options={{ title: 'Order Details' }} />
+      <PurchaseStack.Screen name="PurchaseOrderDetail" component={PurchaseOrderDetailScreen} options={{ title: 'Purchase Order Details' }} />
+      <PurchaseStack.Screen name="SalesOrderDetail" component={SalesOrderDetailScreen} options={{ title: 'Sales Order Details' }} />
+    </PurchaseStack.Navigator>
   )
 }
+
+export const SalesOrdersStack: React.FC<any> = () => {
+  const { theme } = useTheme()
+  return (
+    <SalesStack.Navigator
+      id="SalesOrdersStack"
+      screenOptions={{
+        header: (props: any) => <Header {...props} />,
+        cardStyle: { backgroundColor: theme.background }
+      }}
+    >
+      <SalesStack.Screen
+        name="OrderList"
+        component={OrderListScreen}
+        options={{ headerShown: false }}
+        initialParams={{ orderType: 'sales' }}
+      />
+      <SalesStack.Screen name="OrderDetail" component={OrderDetailScreen} options={{ title: 'Order Details' }} />
+      <SalesStack.Screen name="PurchaseOrderDetail" component={PurchaseOrderDetailScreen} options={{ title: 'Purchase Order Details' }} />
+      <SalesStack.Screen name="SalesOrderDetail" component={SalesOrderDetailScreen} options={{ title: 'Sales Order Details' }} />
+    </SalesStack.Navigator>
+  )
+}
+
+// Keep backward compat export
+export const OrdersStack = PurchaseOrdersStack

@@ -1,12 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  ScrollView,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  RefreshControl, ScrollView, TextInput,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
@@ -24,27 +19,30 @@ import { purchaseOrderService, PurchaseOrder } from '../../services/api/ApiServi
 import { spacing, typography } from '../../theme'
 import { useExportWithModal } from '../../hooks/useExportWithModal'
 
-interface PurchaseOrderListScreenProps {
-  navigation: any
-}
+const fmtDate = (v: string) =>
+  new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-')
 
-export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = ({ navigation }) => {
+const STATUS_FILTERS_PO = ['ALL', 'PENDING', 'CONFIRMED', 'DELIVERED', 'CANCELLED'] as const
+type POFilter = typeof STATUS_FILTERS_PO[number]
+
+export const PurchaseOrderListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { theme } = useTheme()
   const { showSuccess, showError, showWarning } = useToast()
-  const { modalState, closeModal, exportToExcelWithModal } = useExportWithModal()
+  const { modalState, closeModal, exportToExcelWithModal, exporting } = useExportWithModal()
+  const commonStyles = getCommonStyles(theme)
+
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED'>('ALL')
+  const [filter, setFilter] = useState<POFilter>('ALL')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [search, setSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const [itemsPerPage, setItemsPerPage] = useState(5)
-  const commonStyles = getCommonStyles(theme)
 
   useEffect(() => { loadOrders(1) }, [])
-
   useFocusEffect(useCallback(() => { loadOrders(1) }, []))
 
   const loadOrders = async (page = 1, pageSize = itemsPerPage) => {
@@ -56,153 +54,65 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
       setTotalItems(response.total || response.purchaseOrders.length)
       setTotalPages(Math.max(1, Math.ceil((response.total || response.purchaseOrders.length) / limit)))
       setCurrentPage(page)
-    } catch (error) {
+    } catch {
       showError('Error', 'Failed to load purchase orders')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleRefresh = async () => {
-    setRefreshing(true)
-    await loadOrders(1)
-    setRefreshing(false)
-  }
-
+  const handleRefresh = async () => { setRefreshing(true); await loadOrders(1); setRefreshing(false) }
   const handlePageChange = (page: number) => loadOrders(page)
   const handleItemsPerPageChange = (value: number) => { setItemsPerPage(value); loadOrders(1, value) }
 
   const handleUpdateStatus = async (orderId: string, status: PurchaseOrder['status']) => {
     try {
       const updated = await purchaseOrderService.updateStatus(orderId, status)
-      setOrders(orders.map(o => o.id === orderId ? updated : o))
-      showSuccess('Success', 'Order status updated successfully')
-    } catch (error) {
+      setOrders(prev => prev.map(o => o.id === orderId ? updated : o))
+      showSuccess('Success', 'Order status updated')
+    } catch {
       showError('Error', 'Failed to update order status')
     }
   }
 
   const handleDeleteOrder = (item: PurchaseOrder) => {
-    showWarning(
-      'Delete Order',
-      `Delete order ${item.orderNumber}?`,
-      {
-        action: {
-          label: 'Delete',
-          onPress: async () => {
-            try {
-              await purchaseOrderService.deletePurchaseOrder(item.id)
-              setOrders(prev => prev.filter(o => o.id !== item.id))
-              showSuccess('Deleted', 'Order deleted')
-            } catch {
-              showError('Error', 'Failed to delete order')
-            }
+    showWarning('Delete Order', `Delete order ${item.orderNumber}?`, {
+      action: {
+        label: 'Delete',
+        onPress: async () => {
+          try {
+            await purchaseOrderService.deletePurchaseOrder(item.id)
+            setOrders(prev => prev.filter(o => o.id !== item.id))
+            showSuccess('Deleted', 'Order deleted')
+          } catch {
+            showError('Error', 'Failed to delete order')
           }
         }
       }
-    )
+    })
   }
 
   const handleExport = async () => {
     try {
       const response = await purchaseOrderService.getPurchaseOrders(1, 10000)
-      const allOrders = response.purchaseOrders || []
-      const filteredForExport = allOrders.filter(order => filter === 'ALL' || order.status === filter)
+      const all = response.purchaseOrders || []
+      const filtered = all.filter(o => filter === 'ALL' || o.status === filter)
       await exportToExcelWithModal({
-        data: filteredForExport,
+        data: filtered,
         columns: [
           { key: 'orderNumber', label: 'Order #' },
+          { key: 'brand.name', label: 'Brand' },
           { key: 'status', label: 'Status' },
-          { key: 'totalAmount', label: 'Amount' },
-          { key: 'orderDate', label: 'Order Date' },
+          { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${(v || 0).toLocaleString()}` },
+          { key: 'orderDate', label: 'Order Date', format: fmtDate },
+          { key: 'createdAt', label: 'Created At', format: fmtDate },
         ],
         filename: 'purchase_orders_export',
         reportTitle: 'Purchase Orders Report',
       })
     } catch {
-      showError('Export Failed', 'Unable to load purchase orders for export')
+      showError('Export Failed', 'Unable to export purchase orders')
     }
-  }
-
-  const filteredOrders = orders.filter(order =>
-    filter === 'ALL' || order.status === filter
-  )
-
-  const FilterButton = ({ status, title }: { status: typeof filter; title: string }) => (
-    <TouchableOpacity
-      style={[
-        styles.filterButton,
-        { backgroundColor: filter === status ? theme.primary : 'transparent', borderColor: theme.border }
-      ]}
-      onPress={() => setFilter(status)}
-    >
-      <Text style={[styles.filterButtonText, { color: filter === status ? theme.textInverse : theme.text }]}>
-        {title}
-      </Text>
-    </TouchableOpacity>
-  )
-
-  const renderOrder = ({ item }: { item: PurchaseOrder }) => {
-    const brand = (item as any).brand?.name || item.supplierName || 'N/A'
-    return (
-      <Card style={[commonStyles.glassCard, styles.orderCard]}>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('PurchaseOrderDetail', { orderId: item.id })}
-          activeOpacity={0.7}
-        >
-          <View style={styles.badgeContainer}>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-              <Text style={styles.statusBadgeText}>{item.status}</Text>
-            </View>
-          </View>
-
-          <View style={styles.centerIconWrap}>
-            <Icon name="local-shipping" size={48} color={theme.border} />
-          </View>
-
-          <View style={styles.detailsWrap}>
-            <Text style={styles.metaLabelSmall}>ORDER #</Text>
-            <Text style={styles.orderNumber}>{item.orderNumber}</Text>
-
-            <View style={styles.gridRow}>
-              <View style={styles.gridCol}>
-                <Text style={styles.metaLabelSmall}>Brand</Text>
-                <Text style={styles.metaValue}>{brand}</Text>
-              </View>
-              <View style={styles.gridCol}>
-                <Text style={styles.metaLabelSmall}>Amount</Text>
-                <Text style={styles.metaValue}>₹{Number(item.totalAmount).toFixed(2)}</Text>
-              </View>
-            </View>
-
-            <View style={styles.gridRow}>
-              <View style={styles.gridCol}>
-                <Text style={styles.metaLabelSmall}>Date</Text>
-                <Text style={styles.metaValue}>{new Date(item.orderDate).toLocaleDateString()}</Text>
-              </View>
-              <View style={styles.gridCol}>
-                <Text style={styles.metaLabelSmall}>Items</Text>
-                <Text style={styles.metaValue}>{item.items?.length ?? 0}</Text>
-              </View>
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => navigation.navigate('PurchaseOrderForm', { orderId: item.id })}
-          >
-            <Icon name="edit" size={14} color={theme.text} />
-            <Text style={styles.editBtnText}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteOrder(item)}>
-            <Icon name="delete-outline" size={14} color="#fff" />
-            <Text style={styles.deleteBtnText}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      </Card>
-    )
   }
 
   const getStatusColor = (status: PurchaseOrder['status']) => {
@@ -215,20 +125,23 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
     }
   }
 
-  const renderSkeleton = () => (
-    <Card style={styles.orderCard}>
-      <Skeleton height={20} width="60%" style={{ marginBottom: spacing.sm }} />
-      <Skeleton height={16} width="80%" style={{ marginBottom: spacing.xs }} />
-      <Skeleton height={14} width="40%" />
-    </Card>
+  const filteredOrders = orders.filter(o =>
+    (filter === 'ALL' || o.status === filter) &&
+    (search === '' || o.orderNumber?.toLowerCase().includes(search.toLowerCase()))
   )
 
-  const styles = StyleSheet.create({
+  const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
+    searchBox: {
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
+      borderRadius: 12, paddingHorizontal: 12, height: 42, gap: 8,
+      marginHorizontal: 16, marginBottom: 8,
+    },
+    searchInput: { flex: 1, fontSize: 14, color: theme.text },
+    filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
+    chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
     content: { flex: 1, paddingHorizontal: spacing.base },
-    filterContainer: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.base, paddingVertical: spacing.sm },
-    filterButton: { paddingHorizontal: spacing.base, paddingVertical: spacing.sm, borderRadius: 20, borderWidth: 1 },
-    filterButtonText: { fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium },
     orderCard: { marginBottom: spacing.md, padding: 0, borderRadius: 16, overflow: 'hidden' },
     badgeContainer: { alignItems: 'flex-end', padding: 16 },
     statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 16 },
@@ -245,13 +158,72 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
     editBtnText: { fontSize: 13, fontWeight: '700', color: theme.text },
     deleteBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, backgroundColor: theme.error },
     deleteBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
-    fab: { position: 'absolute', right: spacing.base, bottom: 24, width: 64, height: 64, borderRadius: 32, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', elevation: 8 },
-    emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing['4xl'] },
-    emptyText: { fontSize: typography.fontSize.base, color: theme.textSecondary, textAlign: 'center', marginTop: spacing.base },
+    emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+    emptyText: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', marginTop: 12 },
   })
 
+  const renderOrder = ({ item }: { item: PurchaseOrder }) => {
+    const brand = (item as any).brand?.name || item.supplierName || 'N/A'
+    return (
+      <Card style={[commonStyles.glassCard, s.orderCard]}>
+        <TouchableOpacity onPress={() => navigation.navigate('PurchaseOrderDetail', { orderId: item.id })} activeOpacity={0.7}>
+          <View style={s.badgeContainer}>
+            <View style={[s.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+              <Text style={s.statusBadgeText}>{item.status}</Text>
+            </View>
+          </View>
+          <View style={s.centerIconWrap}>
+            <Icon name="local-shipping" size={48} color={theme.border} />
+          </View>
+          <View style={s.detailsWrap}>
+            <Text style={s.metaLabelSmall}>ORDER #</Text>
+            <Text style={s.orderNumber}>{item.orderNumber}</Text>
+            <View style={s.gridRow}>
+              <View style={s.gridCol}>
+                <Text style={s.metaLabelSmall}>Brand</Text>
+                <Text style={s.metaValue}>{brand}</Text>
+              </View>
+              <View style={s.gridCol}>
+                <Text style={s.metaLabelSmall}>Amount</Text>
+                <Text style={s.metaValue}>₹{Number(item.totalAmount).toFixed(2)}</Text>
+              </View>
+            </View>
+            <View style={s.gridRow}>
+              <View style={s.gridCol}>
+                <Text style={s.metaLabelSmall}>Date</Text>
+                <Text style={s.metaValue}>{new Date(item.orderDate).toLocaleDateString()}</Text>
+              </View>
+              <View style={s.gridCol}>
+                <Text style={s.metaLabelSmall}>Items</Text>
+                <Text style={s.metaValue}>{item.items?.length ?? 0}</Text>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+        <View style={s.actionRow}>
+          <TouchableOpacity style={s.editBtn} onPress={() => navigation.navigate('PurchaseOrderForm', { orderId: item.id })}>
+            <Icon name="edit" size={14} color={theme.text} />
+            <Text style={s.editBtnText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.deleteBtn} onPress={() => handleDeleteOrder(item)}>
+            <Icon name="delete-outline" size={14} color="#fff" />
+            <Text style={s.deleteBtnText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </Card>
+    )
+  }
+
+  const renderSkeleton = () => (
+    <Card style={s.orderCard}>
+      <Skeleton height={20} width="60%" style={{ marginBottom: spacing.sm }} />
+      <Skeleton height={16} width="80%" style={{ marginBottom: spacing.xs }} />
+      <Skeleton height={14} width="40%" />
+    </Card>
+  )
+
   return (
-    <SafeAreaView style={styles.container} edges={['right', 'left']}>
+    <SafeAreaView style={s.container} edges={['right', 'left']}>
       <MainHeader />
       <ScreenActionBar
         title="Purchase Orders"
@@ -261,17 +233,42 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onExport={handleExport}
+        exporting={exporting}
       />
 
+      <View style={s.searchBox}>
+        <Icon name="search" size={18} color={theme.mutedForeground} />
+        <TextInput
+          style={s.searchInput}
+          placeholder="Search purchase orders..."
+          placeholderTextColor={theme.mutedForeground}
+          value={search}
+          onChangeText={setSearch}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Icon name="close" size={16} color={theme.mutedForeground} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.filterContainer}>
-          {(['ALL', 'PENDING', 'CONFIRMED', 'DELIVERED', 'CANCELLED'] as const).map(s => (
-            <FilterButton key={s} status={s} title={s === 'ALL' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()} />
+        <View style={s.filterRow}>
+          {STATUS_FILTERS_PO.map(st => (
+            <TouchableOpacity
+              key={st}
+              style={[s.chip, { backgroundColor: filter === st ? theme.primary : 'transparent', borderColor: filter === st ? theme.primary : theme.border }]}
+              onPress={() => setFilter(st)}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '600', color: filter === st ? theme.primaryForeground : theme.text }}>
+                {st === 'ALL' ? 'All' : st.charAt(0) + st.slice(1).toLowerCase()}
+              </Text>
+            </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
 
-      <View style={styles.content}>
+      <View style={s.content}>
         <FlatList
           data={loading ? Array(5).fill({}) : filteredOrders}
           renderItem={loading ? renderSkeleton : renderOrder}
@@ -279,36 +276,26 @@ export const PurchaseOrderListScreen: React.FC<PurchaseOrderListScreenProps> = (
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 80 }}
-          ListEmptyComponent={
-            !loading ? (
-              <View style={styles.emptyContainer}>
-                <Icon name="description" size={64} color={theme.textSecondary} />
-                <Text style={styles.emptyText}>
-                  {filter === 'ALL' ? 'No purchase orders available' : `No ${filter.toLowerCase()} orders`}
-                </Text>
-              </View>
-            ) : null
-          }
+          ListEmptyComponent={!loading ? (
+            <View style={s.emptyContainer}>
+              <Icon name="description" size={64} color={theme.textSecondary} />
+              <Text style={s.emptyText}>
+                {filter === 'ALL' ? 'No purchase orders available' : `No ${filter.toLowerCase()} orders`}
+              </Text>
+            </View>
+          ) : null}
           ListFooterComponent={!loading && filteredOrders.length > 0 ? (
             <PaginationControl
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={totalItems}
-              itemsPerPage={itemsPerPage}
-              onItemsPerPageChange={handleItemsPerPageChange}
-              onPageChange={handlePageChange}
+              currentPage={currentPage} totalPages={totalPages} totalItems={totalItems}
+              itemsPerPage={itemsPerPage} onItemsPerPageChange={handleItemsPerPageChange} onPageChange={handlePageChange}
             />
           ) : null}
         />
       </View>
 
-      {/* global QuickAddPanel provides FAB - removed local FAB */}
       <DownloadCompletionModal
-        visible={modalState.visible}
-        filename={modalState.filename}
-        filepath={modalState.filepath}
-        filesize={modalState.filesize}
-        onClose={closeModal}
+        visible={modalState.visible} filename={modalState.filename}
+        filepath={modalState.filepath} filesize={modalState.filesize} onClose={closeModal}
       />
     </SafeAreaView>
   )

@@ -1,6 +1,5 @@
-import { Alert, Platform } from 'react-native'
+import { Alert } from 'react-native'
 import RNFS from 'react-native-fs'
-import Share from 'react-native-share'
 import * as XLSX from 'xlsx-js-style'
 
 export interface ExportColumn {
@@ -211,16 +210,7 @@ export const exportToExcel = async ({
 
     await RNFS.writeFile(path, wbout, 'base64')
 
-    // Share file
-    const shareOptions = {
-      title: reportTitle,
-      url: `file://${path}`,
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      failOnCancel: false,
-    }
-
-    await Share.open(shareOptions)
-    return { success: true, filename: finalFilename }
+    return { success: true, filename: finalFilename, filepath: path }
   } catch (error) {
     console.error('Export Error:', error)
     Alert.alert('Export Error', 'An unexpected error occurred while exporting.')

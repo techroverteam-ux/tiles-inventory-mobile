@@ -32,35 +32,7 @@ export const useExportWithModal = () => {
     filepath: '',
     filesize: '',
   })
-
-  const getFilesDirectory = useCallback(async () => {
-    try {
-      // Try to use Download directory first (user-accessible)
-      const downloadPath = `${RNFS.DownloadDirectoryPath}/TilesInventory`
-      
-      // Create directory if it doesn't exist
-      const exists = await RNFS.exists(downloadPath)
-      if (!exists) {
-        try {
-          await RNFS.mkdir(downloadPath, { NSURLIsExcludedFromBackupKey: false })
-        } catch (e) {
-          // If Download doesn't work, try Documents
-          const documentsPath = `${RNFS.DocumentDirectoryPath}/Exports`
-          const docExists = await RNFS.exists(documentsPath)
-          if (!docExists) {
-            await RNFS.mkdir(documentsPath, { NSURLIsExcludedFromBackupKey: false })
-          }
-          return documentsPath
-        }
-      }
-      
-      return downloadPath
-    } catch (error) {
-      console.error('Error accessing file directory:', error)
-      // Fallback to cache directory
-      return RNFS.CachesDirectoryPath
-    }
-  }, [])
+  const [exporting, setExporting] = useState(false)
 
   const getFileSizeString = useCallback((bytes: number): string => {
     if (bytes === 0) return '0 B'
@@ -72,59 +44,49 @@ export const useExportWithModal = () => {
 
   const exportToExcelWithModal = useCallback(async (options: ExportOptions) => {
     try {
-      const exportsDir = await getFilesDirectory()
-      
-      // Prepare data for export
-      const columns = options.columns
-      const data = options.data
-      const filename = options.filename || 'export'
-      const includeTimestamp = options.includeTimestamp !== false
-      const reportTitle = options.reportTitle || `${filename.charAt(0).toUpperCase() + filename.slice(1)} Report`
+      setExporting(true)
 
-      // Call the original export function with custom path handling
       const result = await utilsExportToExcel({
         ...options,
-        filename,
-        reportTitle,
-        includeTimestamp,
+        filename: options.filename || 'export',
+        reportTitle: options.reportTitle || `${(options.filename || 'export').charAt(0).toUpperCase() + (options.filename || 'export').slice(1)} Report`,
+        includeTimestamp: options.includeTimestamp !== false,
       })
 
       if ((result as any).success && (result as any).filename) {
-        // Get file info
         const exportedFilename = (result as any).filename
-        const filepath = `${exportsDir}/${exportedFilename}`
-        
-        try {
-          // Try to copy file from cache to exports directory
-          const cacheFile = `${RNFS.CachesDirectoryPath}/${exportedFilename}`
-          const exists = await RNFS.exists(cacheFile)
-          if (exists) {
-            await RNFS.copyFile(cacheFile, filepath)
-          }
-          
-          // Get file size
-          const fileStats = await RNFS.stat(filepath)
-          const filesize = getFileSizeString(fileStats.size)
-          
-          // Show modal
-          setModalState({
-            visible: true,
-            filename: exportedFilename,
-            filepath: filepath,
-            filesize: filesize,
-          })
-        } catch (error) {
-          console.error('Error preparing file for modal:', error)
-          Alert.alert('Export', 'File exported successfully (in cache)')
+        const cacheFilePath = (result as any).filepath || `${RNFS.CachesDirectoryPath}/${exportedFilename}`
+
+        // Save to Downloads/TilesInventory
+        const downloadDir = `${RNFS.DownloadDirectoryPath}/TilesInventory`
+        const dirExists = await RNFS.exists(downloadDir)
+        if (!dirExists) {
+          await RNFS.mkdir(downloadDir)
         }
+
+        const finalPath = `${downloadDir}/${exportedFilename}`
+        await RNFS.copyFile(cacheFilePath, finalPath)
+
+        const fileStats = await RNFS.stat(finalPath)
+        const filesize = getFileSizeString(fileStats.size)
+
+        setExporting(false)
+        setModalState({
+          visible: true,
+          filename: exportedFilename,
+          filepath: finalPath,
+          filesize,
+        })
       } else {
+        setExporting(false)
         Alert.alert('Export Failed', (result as any).error || 'Failed to export file')
       }
     } catch (error) {
+      setExporting(false)
       console.error('Export error:', error)
       Alert.alert('Export Error', 'An unexpected error occurred')
     }
-  }, [getFilesDirectory, getFileSizeString])
+  }, [getFileSizeString])
 
   const closeModal = useCallback(() => {
     setModalState(prev => ({ ...prev, visible: false }))
@@ -134,5 +96,6 @@ export const useExportWithModal = () => {
     modalState,
     closeModal,
     exportToExcelWithModal,
+    exporting,
   }
 }

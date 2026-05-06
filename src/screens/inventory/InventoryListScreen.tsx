@@ -26,7 +26,7 @@ export const InventoryListScreen: React.FC = () => {
   const { theme } = useTheme()
   const navigation = useNavigation<InventoryNavigationProp>()
   const { showWarning, showSuccess, showError } = useToast()
-  const { modalState, closeModal, exportToExcelWithModal } = useExportWithModal()
+  const { modalState, closeModal, exportToExcelWithModal, exporting } = useExportWithModal()
   const commonStyles = getCommonStyles(theme)
 
   const [inventory, setInventory] = useState<Batch[]>([])
@@ -152,12 +152,15 @@ export const InventoryListScreen: React.FC = () => {
       await exportToExcelWithModal({
         data: filteredForExport,
         columns: [
+          { key: 'product.name', label: 'Product' },
           { key: 'batchNumber', label: 'Batch #' },
-          { key: 'productCode', label: 'Product Code' },
-          { key: 'productName', label: 'Product Name' },
-          { key: 'quantity', label: 'Quantity' },
-          { key: 'purchasePrice', label: 'Purchase Price' },
-          { key: 'sellingPrice', label: 'Selling Price' },
+          { key: 'location.name', label: 'Location' },
+          { key: 'quantity', label: 'Qty', format: (v: number) => v?.toString() || '0' },
+          { key: 'unit', label: 'Unit' },
+          { key: 'purchasePrice', label: 'Buying Price', format: (v: number) => `₹${(v || 0).toLocaleString()}` },
+          { key: 'sellingPrice', label: 'Selling Price', format: (v: number) => `₹${(v || 0).toLocaleString()}` },
+          { key: 'expiryDate', label: 'Expiry Date', format: (v: string) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-') : '' },
+          { key: 'createdAt', label: 'Added Date', format: (v: string) => new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-') },
         ],
         filename: 'inventory_export',
         reportTitle: 'Inventory Stock Report',
@@ -336,6 +339,7 @@ export const InventoryListScreen: React.FC = () => {
         onViewModeChange={setViewMode}
         onExport={handleExportFiltered}
         onToggleFilters={() => setShowFilters(v => !v)}
+        exporting={exporting}
       />
       {/* Search bar */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>

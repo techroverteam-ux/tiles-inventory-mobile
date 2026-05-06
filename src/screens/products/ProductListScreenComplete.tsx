@@ -35,7 +35,7 @@ interface ProductListScreenProps {
 export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation }) => {
   const { theme } = useTheme()
   const { showError, showSuccess, showWarning } = useToast()
-  const { modalState, closeModal, exportToExcelWithModal } = useExportWithModal()
+  const { modalState, closeModal, exportToExcelWithModal, exporting } = useExportWithModal()
   const commonStyles = getCommonStyles(theme)
 
   const [products, setProducts] = useState<Product[]>([])
@@ -134,13 +134,18 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
       await exportToExcelWithModal({
         data: filteredProducts,
         columns: [
-          { key: 'productCode', label: 'Product Code' },
-          { key: 'productName', label: 'Product Name' },
+          { key: 'name', label: 'Product Name' },
+          { key: 'brand.name', label: 'Brand' },
           { key: 'category.name', label: 'Category' },
-          { key: 'isActive', label: 'Status' },
+          { key: 'size.name', label: 'Size' },
+          { key: 'sqftPerBox', label: 'Sq Ft/Box', format: (v: number) => v?.toString() || '0' },
+          { key: 'pcsPerBox', label: 'Pcs/Box', format: (v: number) => v?.toString() || '0' },
+          { key: 'isActive', label: 'Status', format: (v: boolean) => v ? 'Active' : 'Inactive' },
+          { key: 'createdBy.name', label: 'Created By' },
+          { key: 'createdAt', label: 'Created Date', format: (v: string) => new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-') },
         ],
         filename: 'products_export',
-        reportTitle: 'Products Catalog Report',
+        reportTitle: 'Products Report',
       })
     } catch {
       showError('Export Failed', 'Unable to load products for export')
@@ -603,6 +608,7 @@ export const ProductListScreen: React.FC<ProductListScreenProps> = ({ navigation
         onViewModeChange={setViewMode}
         onExport={handleExportData}
         onToggleFilters={handleToggleFilters}
+        exporting={exporting}
       />
       {/* Search bar */}
       <View style={styles.searchRow}>

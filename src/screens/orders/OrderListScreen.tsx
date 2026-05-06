@@ -1,13 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  Image,
-  TextInput,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  RefreshControl, Image, TextInput, ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Icon from 'react-native-vector-icons/MaterialIcons'
@@ -16,25 +10,28 @@ import { useToast } from '../../context/ToastContext'
 import { MainHeader } from '../../components/navigation/MainHeader'
 import { ScreenActionBar } from '../../components/common/ScreenActionBar'
 import { PaginationControl } from '../../components/common/PaginationControl'
+import { DownloadCompletionModal } from '../../components/common/DownloadCompletionModal'
 import { Card } from '../../components/common/Card'
 import { Skeleton } from '../../components/loading/Skeleton'
 import { purchaseOrderService, salesOrderService, PurchaseOrder, SalesOrder } from '../../services/api/ApiServices'
-import { spacing, typography, borderRadius } from '../../theme'
+import { spacing, typography } from '../../theme'
 import { getCommonStyles } from '../../theme/commonStyles'
+import { useExportWithModal } from '../../hooks/useExportWithModal'
 
-interface OrderListScreenProps {
-  navigation: any
-  route: any
-}
+const fmtDate = (v: string) =>
+  new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-')
 
 type OrderType = 'purchase' | 'sales'
 
-export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, route }) => {
+const PURCHASE_FILTERS = ['all', 'PENDING', 'CONFIRMED', 'DELIVERED', 'CANCELLED'] as const
+const SALES_FILTERS = ['all', 'DRAFT', 'CONFIRMED', 'DELIVERED', 'CANCELLED'] as const
+
+export const OrderListScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const { theme } = useTheme()
-  const { showToast, showWarning, showSuccess, showError } = useToast()
+  const { showToast, showWarning, showError } = useToast()
+  const { modalState, closeModal, exportToExcelWithModal, exporting } = useExportWithModal()
   const commonStyles = getCommonStyles(theme)
 
-  // Determine order type from route params
   const orderType: OrderType = route.params?.orderType || 'purchase'
 
   const [orders, setOrders] = useState<Array<PurchaseOrder | SalesOrder>>([])
@@ -44,35 +41,30 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
   const [search, setSearch] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
-
-  // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const [itemsPerPage, setItemsPerPage] = useState(5)
 
-  useEffect(() => {
-    loadOrders(1)
-  }, [orderType])
+  useEffect(() => { loadOrders(1) }, [orderType])
 
   const loadOrders = async (page: number, q = search, pageSize = itemsPerPage) => {
     try {
       setLoading(true)
-      let ordersData = []
-      let total = 0
       const limit = pageSize === 0 ? 1000 : pageSize
+      let ordersData: any[] = []
+      let total = 0
 
       if (orderType === 'purchase') {
-        const response = await purchaseOrderService.getPurchaseOrders(page, limit)
-        ordersData = response.purchaseOrders || []
-        total = response.total || 0
+        const res = await purchaseOrderService.getPurchaseOrders(page, limit)
+        ordersData = res.purchaseOrders || []
+        total = res.total || 0
       } else {
-        const response = await salesOrderService.getSalesOrders(page, limit)
-        ordersData = response.salesOrders || []
-        total = response.total || 0
+        const res = await salesOrderService.getSalesOrders(page, limit)
+        ordersData = res.salesOrders || []
+        total = res.total || 0
       }
 
-      // Client-side search filter since API may not support search param
       const filtered = q.trim()
         ? ordersData.filter((o: any) =>
             o.orderNumber?.toLowerCase().includes(q.toLowerCase()) ||
@@ -85,101 +77,127 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
       setTotalItems(q.trim() ? filtered.length : total)
       setTotalPages(Math.max(1, Math.ceil((q.trim() ? filtered.length : total) / limit)))
       setCurrentPage(page)
-    } catch (error) {
-      console.error(`Error loading ${orderType} orders:`, error)
+    } catch {
       showToast(`Failed to load ${orderType} orders`, 'error')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSearch = (q: string) => {
-    setSearch(q)
-    loadOrders(1, q)
-  }
-
-  const handleItemsPerPageChange = (value: number) => {
-    setItemsPerPage(value)
-    loadOrders(1, search, value)
-  }
-
-  const handleRefresh = async () => {
-    setRefreshing(true)
-    await loadOrders(1)
-    setRefreshing(false)
-  }
-
-  const handlePageChange = (newPage: number) => {
-    loadOrders(newPage)
-  }
+  const handleSearch = (q: string) => { setSearch(q); loadOrders(1, q) }
+  const handleItemsPerPageChange = (value: number) => { setItemsPerPage(value); loadOrders(1, search, value) }
+  const handleRefresh = async () => { setRefreshing(true); await loadOrders(1); setRefreshing(false) }
+  const handlePageChange = (newPage: number) => loadOrders(newPage)
 
   const handleExportData = async () => {
     try {
-      const response = orderType === 'purchase'
+      const res = orderType === 'purchase'
         ? await purchaseOrderService.getPurchaseOrders(1, 10000)
         : await salesOrderService.getSalesOrders(1, 10000)
 
-      const allOrders = (orderType === 'purchase' ? response.purchaseOrders : response.salesOrders) || []
-      const filteredForExport = allOrders.filter(order => {
-        const orderNum = order.orderNumber?.toLowerCase() || ''
-        const supplier = order.supplierName?.toLowerCase() || ''
-        const customer = order.customerName?.toLowerCase() || ''
-        const searchText = search.toLowerCase()
-        const matchesSearch = !search || orderNum.includes(searchText) || supplier.includes(searchText) || customer.includes(searchText)
-        const matchesStatus = statusFilter === 'all' || order.status === statusFilter
+      const allOrders = (orderType === 'purchase' ? res.purchaseOrders : res.salesOrders) || []
+      const filtered = allOrders.filter((o: any) => {
+        const matchesSearch = !search || o.orderNumber?.toLowerCase().includes(search.toLowerCase())
+        const matchesStatus = statusFilter === 'all' || o.status === statusFilter
         return matchesSearch && matchesStatus
       })
 
-      import('../../utils/exportUtils').then(({ exportToExcel, commonColumns }) => {
-        const columns = orderType === 'purchase' ? commonColumns.purchaseOrder : commonColumns.salesOrder
-        exportToExcel({
-          data: filteredForExport,
-          columns,
-          filename: `${orderType}_orders_export_filtered`,
-          reportTitle: `${orderType === 'purchase' ? 'Filtered Purchase Orders' : 'Filtered Sales Orders'} Report`,
-        }).then(success => {
-          if (success) showSuccess('Export', 'Excel file ready to share')
+      if (orderType === 'purchase') {
+        await exportToExcelWithModal({
+          data: filtered,
+          columns: [
+            { key: 'orderNumber', label: 'Order #' },
+            { key: 'brand.name', label: 'Brand' },
+            { key: 'status', label: 'Status' },
+            { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${(v || 0).toLocaleString()}` },
+            { key: 'orderDate', label: 'Order Date', format: fmtDate },
+            { key: 'createdAt', label: 'Created At', format: fmtDate },
+          ],
+          filename: 'purchase_orders_export',
+          reportTitle: 'Purchase Orders Report',
         })
-      })
+      } else {
+        await exportToExcelWithModal({
+          data: filtered,
+          columns: [
+            { key: 'orderNumber', label: 'Order #' },
+            { key: 'brand.name', label: 'Brand' },
+            { key: 'totalAmount', label: 'Amount', format: (v: number) => `₹${(v || 0).toLocaleString()}` },
+            { key: 'orderDate', label: 'Order Date', format: fmtDate },
+            { key: 'items.length', label: 'Unique Items', format: (v: number) => v?.toString() || '0' },
+            { key: 'createdAt', label: 'Created At', format: fmtDate },
+          ],
+          filename: 'sales_orders_export',
+          reportTitle: 'Sales Orders Report',
+        })
+      }
     } catch {
-      showError('Export Failed', 'Unable to load filtered orders for export')
+      showError('Export Failed', 'Unable to export orders')
     }
   }
 
-  const handleToggleFilters = () => {
-    setShowFilters(v => !v)
-  }
-
   const handleDelete = (id: string) => {
-    showWarning(
-      'Delete Order',
-      `Are you sure you want to delete this order?`,
-      {
-        action: {
-          label: 'Delete',
-          onPress: () => {
-            setOrders(orders.filter(o => o.id !== id))
-            showToast('Order deleted', 'success')
-          }
+    showWarning('Delete Order', 'Are you sure you want to delete this order?', {
+      action: {
+        label: 'Delete',
+        onPress: () => {
+          setOrders(prev => prev.filter(o => o.id !== id))
+          showToast('Order deleted', 'success')
         }
       }
-    )
+    })
   }
 
+  const filteredOrders = orders.filter((o: any) => statusFilter === 'all' || o.status === statusFilter)
+  const filterOptions = orderType === 'purchase' ? PURCHASE_FILTERS : SALES_FILTERS
 
-  const filteredOrders = orders.filter((o: any) => statusFilter === 'all' ? true : o.status === statusFilter)
-
-  const filterOptions = orderType === 'purchase'
-    ? ['all', 'PENDING', 'CONFIRMED', 'DELIVERED', 'CANCELLED']
-    : ['all', 'DRAFT', 'CONFIRMED', 'DELIVERED', 'CANCELLED']
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    searchBox: {
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
+      borderRadius: 12, paddingHorizontal: 12, height: 42, gap: 8,
+    },
+    searchInput: { flex: 1, fontSize: 14, color: theme.text },
+    listContainer: { padding: spacing.base, paddingBottom: 80 },
+    orderCard: { marginBottom: spacing.md, padding: 0, borderRadius: 16, overflow: 'hidden' },
+    gridCard: { width: '100%' },
+    cardHeader: { flexDirection: 'row', justifyContent: 'flex-end', padding: 12, position: 'absolute', top: 0, right: 0, zIndex: 10 },
+    statusBadge: { backgroundColor: theme.primary, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 16 },
+    statusText: { color: theme.primaryForeground, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 },
+    iconContainer: { height: 180, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.02)' },
+    contentContainer: { padding: 16 },
+    orderLabel: { fontSize: 10, color: theme.mutedForeground, fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 },
+    orderNumber: { fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 16 },
+    grid2x2: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -8 },
+    gridItem: { width: '50%', paddingHorizontal: 8, marginBottom: 16 },
+    gridLabel: { fontSize: 12, color: theme.mutedForeground, marginBottom: 4 },
+    gridValue: { fontSize: 14, fontWeight: 'bold', color: theme.text },
+    gridList: { marginBottom: 16 },
+    gridRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+    gridLabelInline: { fontSize: 12, color: theme.mutedForeground },
+    gridValueInline: { fontSize: 12, fontWeight: 'bold', color: theme.text },
+    actionRow: { flexDirection: 'row', padding: 16, paddingTop: 0, gap: 12 },
+    outlineBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border, paddingVertical: 10, borderRadius: 12, gap: 6 },
+    outlineBtnText: { color: theme.text, fontWeight: 'bold', fontSize: 12 },
+    deleteBtn: { paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border, borderRadius: 12 },
+    tableHeader: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: theme.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderBottomWidth: 1, borderBottomColor: theme.border, marginTop: 8 },
+    tableHeaderText: { color: theme.mutedForeground, fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
+    tableRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: theme.card, borderBottomWidth: 1, borderBottomColor: theme.border },
+    colOrder: { flex: 1.2, flexDirection: 'row', alignItems: 'center', gap: 6 },
+    colPartner: { flex: 1.5, paddingRight: 8 },
+    colAmount: { flex: 1, alignItems: 'flex-end', paddingRight: 8 },
+    colDate: { flex: 1, alignItems: 'flex-end' },
+    statusDot: { width: 6, height: 6, borderRadius: 3 },
+    rowTitle: { color: theme.text, fontSize: 12, fontWeight: 'bold' },
+    rowSubtitle: { color: theme.mutedForeground, fontSize: 10 },
+    rowText: { color: theme.text, fontSize: 12 },
+    rowTextBold: { color: theme.text, fontSize: 12, fontWeight: 'bold' },
+  })
 
   const renderOrderItem = ({ item }: { item: PurchaseOrder | SalesOrder }) => {
     const isPurchase = orderType === 'purchase'
-    const status = item.status
-    const orderNumber = item.orderNumber
-    const date = new Date(item.orderDate).toLocaleDateString('en-GB', {
-      day: '2-digit', month: 'short', year: 'numeric'
-    }).replace(/ /g, '-')
+    const date = fmtDate(item.orderDate)
     const amount = item.totalAmount
     const itemCount = item.items?.length || 0
     const partnerName = isPurchase
@@ -187,51 +205,26 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
       : (item as SalesOrder).customerName
 
     return (
-      <Card style={[
-        commonStyles.glassCard,
-        styles.orderCard,
-        viewMode === 'grid' && styles.gridCard
-      ]}>
+      <Card style={[commonStyles.glassCard, styles.orderCard, viewMode === 'grid' && styles.gridCard]}>
         <View style={styles.cardHeader}>
-          <View style={styles.badgeContainer}>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>
-                {isPurchase ? (status === 'DELIVERED' ? 'DELIVERED' : status) : 'SOLD'}
-              </Text>
-            </View>
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusText}>{isPurchase ? item.status : 'SOLD'}</Text>
           </View>
         </View>
-
         <View style={styles.iconContainer}>
           <Icon name={isPurchase ? 'local-shipping' : 'shopping-cart'} size={48} color={theme.textSecondary} />
         </View>
-
         <View style={styles.contentContainer}>
           <Text style={styles.orderLabel}>ORDER #</Text>
-          <Text style={styles.orderNumber}>{orderNumber}</Text>
-
-          {isPurchase && (
+          <Text style={styles.orderNumber}>{item.orderNumber}</Text>
+          {isPurchase ? (
             <View style={styles.grid2x2}>
-              <View style={styles.gridItem}>
-                <Text style={styles.gridLabel}>Brand</Text>
-                <Text style={styles.gridValue}>{partnerName || 'N/A'}</Text>
-              </View>
-              <View style={styles.gridItem}>
-                <Text style={styles.gridLabel}>Amount</Text>
-                <Text style={styles.gridValue}>₹{amount.toLocaleString()}</Text>
-              </View>
-              <View style={styles.gridItem}>
-                <Text style={styles.gridLabel}>Date</Text>
-                <Text style={styles.gridValue}>{date}</Text>
-              </View>
-              <View style={styles.gridItem}>
-                <Text style={styles.gridLabel}>Items</Text>
-                <Text style={styles.gridValue}>{itemCount}</Text>
-              </View>
+              <View style={styles.gridItem}><Text style={styles.gridLabel}>Brand</Text><Text style={styles.gridValue}>{partnerName}</Text></View>
+              <View style={styles.gridItem}><Text style={styles.gridLabel}>Amount</Text><Text style={styles.gridValue}>₹{amount.toLocaleString()}</Text></View>
+              <View style={styles.gridItem}><Text style={styles.gridLabel}>Date</Text><Text style={styles.gridValue}>{date}</Text></View>
+              <View style={styles.gridItem}><Text style={styles.gridLabel}>Items</Text><Text style={styles.gridValue}>{itemCount}</Text></View>
             </View>
-          )}
-
-          {!isPurchase && (
+          ) : (
             <View style={styles.gridList}>
               <View style={styles.gridRow}>
                 <Text style={styles.gridLabelInline}>Date: </Text>
@@ -242,19 +235,12 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
             </View>
           )}
         </View>
-
         <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={styles.outlineBtn}
-            onPress={() => navigation.navigate(isPurchase ? 'PurchaseOrderDetail' : 'SalesOrderDetail', { orderId: item.id })}
-          >
+          <TouchableOpacity style={styles.outlineBtn} onPress={() => navigation.navigate(isPurchase ? 'PurchaseOrderDetail' : 'SalesOrderDetail', { orderId: item.id })}>
             <Icon name="visibility" size={16} color={theme.text} />
             <Text style={styles.outlineBtnText}>View</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.outlineBtn}
-            onPress={() => navigation.navigate(isPurchase ? 'PurchaseOrderForm' : 'SalesOrderForm', { orderId: item.id })}
-          >
+          <TouchableOpacity style={styles.outlineBtn} onPress={() => navigation.navigate(isPurchase ? 'PurchaseOrderForm' : 'SalesOrderForm', { orderId: item.id })}>
             <Icon name="edit" size={16} color={theme.text} />
             <Text style={styles.outlineBtnText}>Edit</Text>
           </TouchableOpacity>
@@ -268,43 +254,26 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
 
   const renderOrderRow = ({ item }: { item: PurchaseOrder | SalesOrder }) => {
     const isPurchase = orderType === 'purchase'
-    const status = item.status
-    const orderNumber = item.orderNumber
-    const date = new Date(item.orderDate).toLocaleDateString('en-GB', {
-      day: '2-digit', month: 'short', year: 'numeric'
-    }).replace(/ /g, '-')
-    const amount = item.totalAmount
+    const date = fmtDate(item.orderDate)
     const partnerName = isPurchase
       ? ((item as any).brand?.name || (item as PurchaseOrder).supplierName || 'N/A')
       : (item as SalesOrder).customerName
 
     return (
-      <TouchableOpacity 
-        style={styles.tableRow}
-        onPress={() => navigation.navigate(isPurchase ? 'PurchaseOrderDetail' : 'SalesOrderDetail', { orderId: item.id })}
-        activeOpacity={0.7}
-      >
+      <TouchableOpacity style={styles.tableRow} onPress={() => navigation.navigate(isPurchase ? 'PurchaseOrderDetail' : 'SalesOrderDetail', { orderId: item.id })} activeOpacity={0.7}>
         <View style={styles.colOrder}>
-          <Text style={styles.rowTitle} numberOfLines={1}>{orderNumber}</Text>
-          <View style={[styles.statusDot, { backgroundColor: status === 'DELIVERED' ? theme.success : theme.primary }]} />
+          <Text style={styles.rowTitle} numberOfLines={1}>{item.orderNumber}</Text>
+          <View style={[styles.statusDot, { backgroundColor: item.status === 'DELIVERED' ? theme.success : theme.primary }]} />
         </View>
-        <View style={styles.colPartner}>
-          <Text style={styles.rowText} numberOfLines={1}>{partnerName || 'N/A'}</Text>
-        </View>
-        <View style={styles.colAmount}>
-          <Text style={styles.rowTextBold}>₹{amount.toLocaleString()}</Text>
-        </View>
-        <View style={styles.colDate}>
-          <Text style={styles.rowSubtitle}>{date}</Text>
-        </View>
+        <View style={styles.colPartner}><Text style={styles.rowText} numberOfLines={1}>{partnerName || 'N/A'}</Text></View>
+        <View style={styles.colAmount}><Text style={styles.rowTextBold}>₹{item.totalAmount.toLocaleString()}</Text></View>
+        <View style={styles.colDate}><Text style={styles.rowSubtitle}>{date}</Text></View>
       </TouchableOpacity>
     )
   }
 
-  const renderItem = ({ item }: { item: PurchaseOrder | SalesOrder }) => {
-    if (viewMode === 'list') return renderOrderRow({ item })
-    return renderOrderItem({ item })
-  }
+  const renderItem = ({ item }: { item: PurchaseOrder | SalesOrder }) =>
+    viewMode === 'list' ? renderOrderRow({ item }) : renderOrderItem({ item })
 
   const renderListHeader = () => {
     if (viewMode !== 'list' || orders.length === 0) return null
@@ -330,218 +299,6 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
     </Card>
   )
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.background,
-    },
-    searchBox: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: theme.surface,
-      borderWidth: 1,
-      borderColor: theme.border,
-      borderRadius: 12,
-      paddingHorizontal: 12,
-      height: 42,
-      gap: 8,
-    },
-    searchInput: {
-      flex: 1,
-      fontSize: 14,
-      color: theme.text,
-    },
-    listContainer: {
-      padding: spacing.base,
-      paddingBottom: 80,
-    },
-    orderCard: {
-      marginBottom: spacing.md,
-      padding: 0,
-      borderRadius: 16,
-      overflow: 'hidden',
-    },
-    cardHeader: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      padding: 12,
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      zIndex: 10,
-    },
-    badgeContainer: {
-      flexDirection: 'row',
-    },
-    statusBadge: {
-      backgroundColor: theme.primary,
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-      borderRadius: 16,
-    },
-    statusText: {
-      color: theme.primaryForeground,
-      fontSize: 10,
-      fontWeight: 'bold',
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-    iconContainer: {
-      height: 180,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'rgba(255,255,255,0.02)',
-    },
-    contentContainer: {
-      padding: 16,
-    },
-    orderLabel: {
-      fontSize: 10,
-      color: theme.mutedForeground,
-      fontWeight: 'bold',
-      letterSpacing: 1,
-      marginBottom: 4,
-    },
-    orderNumber: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: theme.text,
-      marginBottom: 16,
-    },
-    grid2x2: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginHorizontal: -8,
-    },
-    gridItem: {
-      width: '50%',
-      paddingHorizontal: 8,
-      marginBottom: 16,
-    },
-    gridLabel: {
-      fontSize: 12,
-      color: theme.mutedForeground,
-      marginBottom: 4,
-    },
-    gridValue: {
-      fontSize: 14,
-      fontWeight: 'bold',
-      color: theme.text,
-    },
-    gridList: {
-      marginBottom: 16,
-    },
-    gridRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    gridLabelInline: {
-      fontSize: 12,
-      color: theme.mutedForeground,
-    },
-    gridValueInline: {
-      fontSize: 12,
-      fontWeight: 'bold',
-      color: theme.text,
-    },
-    actionRow: {
-      flexDirection: 'row',
-      padding: 16,
-      paddingTop: 0,
-      gap: 12,
-    },
-    outlineBtn: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: theme.border,
-      paddingVertical: 10,
-      borderRadius: 12,
-      gap: 6,
-    },
-    outlineBtnText: {
-      color: theme.text,
-      fontWeight: 'bold',
-      fontSize: 12,
-    },
-    deleteBtn: {
-      paddingHorizontal: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: theme.border,
-      borderRadius: 12,
-    },
-    fab: {
-      position: 'absolute',
-      right: spacing.base,
-      bottom: spacing.base,
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      backgroundColor: theme.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      elevation: 8,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-    },
-    tableHeader: {
-      flexDirection: 'row',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: theme.surface,
-      borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
-      marginTop: 8,
-    },
-    tableHeaderText: {
-      color: theme.mutedForeground,
-      fontSize: 10,
-      fontWeight: 'bold',
-      letterSpacing: 1,
-    },
-    tableRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      backgroundColor: theme.card,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
-    },
-    colOrder: { flex: 1.2, flexDirection: 'row', alignItems: 'center', gap: 6 },
-    colPartner: { flex: 1.5, paddingRight: 8 },
-    colAmount: { flex: 1, alignItems: 'flex-end', paddingRight: 8 },
-    colDate: { flex: 1, alignItems: 'flex-end' },
-    statusDot: { width: 6, height: 6, borderRadius: 3 },
-    rowTitle: {
-      color: theme.text,
-      fontSize: 12,
-      fontWeight: 'bold',
-    },
-    rowSubtitle: {
-      color: theme.mutedForeground,
-      fontSize: 10,
-    },
-    rowText: {
-      color: theme.text,
-      fontSize: 12,
-    },
-    rowTextBold: {
-      color: theme.text,
-      fontSize: 12,
-      fontWeight: 'bold',
-    },
-  })
-
   return (
     <SafeAreaView style={styles.container} edges={['right', 'left']}>
       <MainHeader />
@@ -553,11 +310,12 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onExport={handleExportData}
-        onToggleFilters={handleToggleFilters}
+        onToggleFilters={() => setShowFilters(v => !v)}
+        exporting={exporting}
       />
-      {/* Search bar */}
+
       <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
-        <View style={[styles.searchBox]}>
+        <View style={styles.searchBox}>
           <Icon name="search" size={18} color={theme.textSecondary} />
           <TextInput
             style={styles.searchInput}
@@ -587,9 +345,7 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
                     borderWidth: 1,
                     borderColor: statusFilter === f ? theme.primary : theme.border,
                     backgroundColor: statusFilter === f ? theme.primary : theme.surface,
-                    borderRadius: 999,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
+                    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6,
                   }}
                 >
                   <Text style={{ color: statusFilter === f ? theme.primaryForeground : theme.text, fontWeight: '700', fontSize: 12 }}>
@@ -601,7 +357,7 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
           </ScrollView>
         </View>
       )}
-      
+
       <FlatList
         data={loading ? Array(viewMode === 'list' ? 6 : 3).fill({}) : filteredOrders}
         renderItem={loading ? renderSkeleton : renderItem}
@@ -610,21 +366,18 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation, ro
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={renderListHeader}
-        ListFooterComponent={
-          !loading && filteredOrders.length > 0 ? (
-            <PaginationControl
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={filteredOrders.length}
-              itemsPerPage={itemsPerPage}
-              onItemsPerPageChange={handleItemsPerPageChange}
-              onPageChange={handlePageChange}
-            />
-          ) : null
-        }
+        ListFooterComponent={!loading && filteredOrders.length > 0 ? (
+          <PaginationControl
+            currentPage={currentPage} totalPages={totalPages} totalItems={filteredOrders.length}
+            itemsPerPage={itemsPerPage} onItemsPerPageChange={handleItemsPerPageChange} onPageChange={handlePageChange}
+          />
+        ) : null}
       />
 
-      {/* global QuickAddPanel provides FAB - removed local FAB */}
+      <DownloadCompletionModal
+        visible={modalState.visible} filename={modalState.filename}
+        filepath={modalState.filepath} filesize={modalState.filesize} onClose={closeModal}
+      />
     </SafeAreaView>
   )
 }

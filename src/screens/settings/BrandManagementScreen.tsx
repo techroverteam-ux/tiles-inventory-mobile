@@ -18,7 +18,8 @@ import { withOpacity } from '../../utils/colorUtils'
 import { getCommonStyles } from '../../theme/commonStyles'
 import { FormModal } from '../../components/common/FormModal'
 import { FormField, ActiveStatusToggle, FormActions } from '../../components/common/FormComponents'
-import { exportToExcel, commonColumns } from '../../utils/exportUtils'
+import { useExportWithModal } from '../../hooks/useExportWithModal'
+import { DownloadCompletionModal } from '../../components/common/DownloadCompletionModal'
 
 const fmtDate = (d: string) => {
   const dt = new Date(d)
@@ -28,6 +29,7 @@ const fmtDate = (d: string) => {
 export const BrandManagementScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { theme } = useTheme()
   const { showSuccess, showError, showWarning } = useToast()
+  const { modalState, closeModal, exportToExcelWithModal, exporting } = useExportWithModal()
   const commonStyles = getCommonStyles(theme)
 
   const [brands, setBrands] = useState<Brand[]>([])
@@ -100,15 +102,25 @@ export const BrandManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
 
   const resetForm = () => { setFormData({ name: '', description: '', isActive: true }); setEditingBrand(null); setShowForm(false) }
 
-  const handleExport = () => {
-    exportToExcel({ data: brands, columns: [
-      { key: 'name', label: 'Brand Name' },
-      { key: 'description', label: 'Description' },
-      { key: 'isActive', label: 'Status', format: (v: boolean) => v ? 'Active' : 'Inactive' },
-      { key: '_count.products', label: 'Products', format: (v: number) => v?.toString() || '0' },
-      { key: 'createdAt', label: 'Created Date', format: (v: string) => fmtDate(v) },
-    ], filename: 'brands_export', reportTitle: 'Brands Report' })
-      .then(ok => { if (ok) showSuccess('Export', 'Excel file ready to share') })
+  const handleExport = async () => {
+    try {
+      const res = await (await import('../../services/api/ApiServices')).brandService.getBrands({ page: 1, limit: 10000 })
+      await exportToExcelWithModal({
+        data: res.brands,
+        columns: [
+          { key: 'name', label: 'Brand Name' },
+          { key: 'description', label: 'Description' },
+          { key: 'contactInfo', label: 'Contact Info' },
+          { key: 'isActive', label: 'Status', format: (v: boolean) => v ? 'Active' : 'Inactive' },
+          { key: '_count.categories', label: 'Categories', format: (v: number) => v?.toString() || '0' },
+          { key: '_count.products', label: 'Products', format: (v: number) => v?.toString() || '0' },
+          { key: 'createdAt', label: 'Created Date', format: (v: string) => fmtDate(v) },
+          { key: 'updatedAt', label: 'Updated Date', format: (v: string) => fmtDate(v) },
+        ],
+        filename: 'brands_export',
+        reportTitle: 'Brands Report',
+      })
+    } catch { showError('Export Failed', 'Unable to export brands') }
   }
 
   const s = StyleSheet.create({
@@ -301,7 +313,7 @@ export const BrandManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
           <TouchableOpacity style={[s.iconBtn, showFilters && { backgroundColor: withOpacity(theme.primary, 0.1), borderColor: theme.primary }]} onPress={() => setShowFilters(v => !v)}>
             <Icon name="tune" size={18} color={showFilters ? theme.primary : theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={s.iconBtn} onPress={handleExport}>
+          <TouchableOpacity style={[s.iconBtn, exporting && { opacity: 0.5 }]} onPress={handleExport} disabled={exporting}>
             <Icon name="file-download" size={18} color={theme.text} />
           </TouchableOpacity>
         </View>
@@ -356,6 +368,7 @@ export const BrandManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
         ) : null}
       />
 
+      <DownloadCompletionModal visible={modalState.visible} filename={modalState.filename} filepath={modalState.filepath} filesize={modalState.filesize} onClose={closeModal} />
       <FormModal key={editingBrand?.id ?? 'new'} visible={showForm} title={editingBrand ? 'Edit Brand' : 'Add New Brand'} onClose={resetForm}>
         <FormField label="Name" required value={formData.name} onChangeText={t => setFormData(p => ({ ...p, name: t }))} placeholder="Enter brand name" />
         <FormField label="Description" value={formData.description} onChangeText={t => setFormData(p => ({ ...p, description: t }))} placeholder="Enter description" multiline numberOfLines={3} style={{ height: 80, textAlignVertical: 'top' }} />

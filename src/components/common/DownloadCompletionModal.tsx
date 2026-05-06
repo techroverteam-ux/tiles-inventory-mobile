@@ -8,6 +8,8 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  NativeModules,
+  Linking,
 } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import Share from 'react-native-share'
@@ -35,22 +37,31 @@ export const DownloadCompletionModal: React.FC<DownloadCompletionModalProps> = (
   const { theme } = useTheme()
   const [loading, setLoading] = React.useState(false)
 
+  const getMimeType = () =>
+    filename.endsWith('.pdf')
+      ? 'application/pdf'
+      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
   const handleOpenFile = async () => {
     try {
       setLoading(true)
       if (onOpenFile) {
         await Promise.resolve(onOpenFile())
-      } else {
-        await Share.open({
-          url: `file://${filepath}`,
-          type: filename.endsWith('.pdf')
-            ? 'application/pdf'
-            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        })
+        setTimeout(onClose, 500)
+        return
       }
+      // Open file with system app chooser
+      await Share.open({
+        url: `file://${filepath}`,
+        type: getMimeType(),
+        showAppsToView: true,
+        failOnCancel: false,
+      })
       setTimeout(onClose, 500)
-    } catch (error) {
-      console.log('Error opening file:', error)
+    } catch (error: any) {
+      if (error?.message !== 'User did not share') {
+        Alert.alert('Error', 'Could not open file. Make sure you have an app to open Excel files.')
+      }
     } finally {
       setLoading(false)
     }
@@ -63,13 +74,14 @@ export const DownloadCompletionModal: React.FC<DownloadCompletionModalProps> = (
         url: `file://${filepath}`,
         filename,
         title: `Share ${filename}`,
-        type: filename.endsWith('.pdf')
-          ? 'application/pdf'
-          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        type: getMimeType(),
+        failOnCancel: false,
       })
       setTimeout(onClose, 500)
-    } catch (error) {
-      console.log('Error sharing file:', error)
+    } catch (error: any) {
+      if (error?.message !== 'User did not share') {
+        console.log('Share error:', error)
+      }
     } finally {
       setLoading(false)
     }
@@ -78,26 +90,29 @@ export const DownloadCompletionModal: React.FC<DownloadCompletionModalProps> = (
   const handleOpenFolder = async () => {
     try {
       setLoading(true)
-
       if (Platform.OS === 'android') {
-        try {
-          await Share.open({
-            url: `file://${filepath}`,
-            filename: filepath.substring(filepath.lastIndexOf('/') + 1),
-            message: 'Your export file is ready',
-          })
-          setTimeout(onClose, 500)
-        } catch (e: any) {
-          if (e?.message !== 'User did not share') {
-            Alert.alert('File Location', `File saved to:\n${filepath}`)
-          }
+        // Open the Downloads folder in Android file manager
+        const folderUri = 'content://com.android.externalstorage.documents/document/primary%3ATilesInventory'
+        const canOpen = await Linking.canOpenURL(folderUri)
+        if (canOpen) {
+          await Linking.openURL(folderUri)
+        } else {
+          // Fallback: open Downloads via standard intent
+          await Linking.openURL('content://com.android.externalstorage.documents/document/primary%3ADownload%2FTilesInventory')
+            .catch(() => {
+              // Final fallback: show path
+              Alert.alert(
+                'File Location',
+                `File saved to:\nDownloads/TilesInventory/${filename}`,
+                [{ text: 'OK' }]
+              )
+            })
         }
       } else {
         Alert.alert('File Location', `File saved to:\n${filepath}`)
       }
     } catch (error) {
-      console.log('Error opening folder:', error)
-      Alert.alert('Error', 'Could not open folder')
+      Alert.alert('File Location', `File saved to:\nDownloads/TilesInventory/${filename}`)
     } finally {
       setLoading(false)
     }
@@ -245,8 +260,8 @@ export const DownloadCompletionModal: React.FC<DownloadCompletionModalProps> = (
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.content}>
+      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={styles.content} activeOpacity={1} onPress={() => {}}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose} disabled={loading}>
             <Icon name="close" size={20} color={theme.text} />
           </TouchableOpacity>
@@ -259,7 +274,7 @@ export const DownloadCompletionModal: React.FC<DownloadCompletionModalProps> = (
             )}
           </View>
 
-          <Text style={styles.title}>Download Complete!</Text>
+          <Text style={styles.title}>Export Download Complete!</Text>
           <Text style={styles.subtitle}>Your file has been saved successfully</Text>
 
           <View style={styles.fileInfo}>
@@ -274,7 +289,7 @@ export const DownloadCompletionModal: React.FC<DownloadCompletionModalProps> = (
               <Text style={styles.fileName} numberOfLines={1}>
                 {filename}
               </Text>
-              <Text style={styles.fileSize}>{filesize} • Downloads folder</Text>
+              <Text style={styles.fileSize}>{filesize} • Downloads/TilesInventory</Text>
             </View>
           </View>
 
@@ -285,7 +300,7 @@ export const DownloadCompletionModal: React.FC<DownloadCompletionModalProps> = (
               disabled={loading}
               activeOpacity={0.7}
             >
-              <Icon name="folder-open" size={18} color={theme.primaryForeground} />
+              <Icon name="open-in-new" size={18} color={theme.primaryForeground} />
               <Text style={styles.primaryButtonText}>Open File</Text>
             </TouchableOpacity>
 
@@ -306,17 +321,17 @@ export const DownloadCompletionModal: React.FC<DownloadCompletionModalProps> = (
                 disabled={loading}
                 activeOpacity={0.7}
               >
-                <Icon name="folder" size={16} color={theme.text} />
+                <Icon name="folder-open" size={16} color={theme.text} />
                 <Text style={styles.secondaryButtonText}>Folder</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>File saved to Downloads • Tap outside to close</Text>
+            <Text style={styles.footerText}>Saved to Downloads/TilesInventory • Tap outside to close</Text>
           </View>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   )
 }

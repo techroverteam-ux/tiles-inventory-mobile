@@ -18,7 +18,8 @@ import { withOpacity } from '../../utils/colorUtils'
 import { getCommonStyles } from '../../theme/commonStyles'
 import { FormModal } from '../../components/common/FormModal'
 import { FormField, ActiveStatusToggle, FormActions } from '../../components/common/FormComponents'
-import { exportToExcel } from '../../utils/exportUtils'
+import { useExportWithModal } from '../../hooks/useExportWithModal'
+import { DownloadCompletionModal } from '../../components/common/DownloadCompletionModal'
 import { resolvePublicUrl } from '../../config/appConfig'
 
 const fmtDate = (d: string) => {
@@ -29,6 +30,7 @@ const fmtDate = (d: string) => {
 export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { theme } = useTheme()
   const { showSuccess, showError, showWarning } = useToast()
+  const { modalState, closeModal, exportToExcelWithModal, exporting } = useExportWithModal()
   const commonStyles = getCommonStyles(theme)
 
   const [locations, setLocations] = useState<Location[]>([])
@@ -135,15 +137,22 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
 
   const resetForm = () => { setFormData({ name: '', address: '', isActive: true, imageUri: '', image: null }); setEditingLocation(null); setShowForm(false) }
 
-  const handleExport = () => {
-    exportToExcel({ data: locations, columns: [
-      { key: 'name', label: 'Location Name' },
-      { key: 'address', label: 'Address' },
-      { key: 'isActive', label: 'Status', format: (v: boolean) => v ? 'Active' : 'Inactive' },
-      { key: '_count.batches', label: 'Stock Batches', format: (v: number) => v?.toString() || '0' },
-      { key: 'createdAt', label: 'Created Date', format: (v: string) => fmtDate(v) },
-    ], filename: 'locations_export', reportTitle: 'Locations Report' })
-      .then(ok => { if (ok) showSuccess('Export', 'Excel file ready to share') })
+  const handleExport = async () => {
+    try {
+      const res = await (await import('../../services/api/ApiServices')).locationService.getLocations({ page: 1, limit: 10000 })
+      await exportToExcelWithModal({
+        data: res.locations,
+        columns: [
+          { key: 'name', label: 'Location Name' },
+          { key: 'address', label: 'Address' },
+          { key: 'isActive', label: 'Status', format: (v: boolean) => v ? 'Active' : 'Inactive' },
+          { key: '_count.batches', label: 'Inventory Batches', format: (v: number) => v?.toString() || '0' },
+          { key: 'createdAt', label: 'Created Date', format: (v: string) => fmtDate(v) },
+        ],
+        filename: 'locations_export',
+        reportTitle: 'Locations Report',
+      })
+    } catch { showError('Export Failed', 'Unable to export locations') }
   }
 
   const s = StyleSheet.create({
@@ -294,7 +303,7 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
           <TouchableOpacity style={[s.iconBtn, showFilters && { backgroundColor: withOpacity(theme.primary, 0.1), borderColor: theme.primary }]} onPress={() => setShowFilters(v => !v)}>
             <Icon name="tune" size={18} color={showFilters ? theme.primary : theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={s.iconBtn} onPress={handleExport}>
+          <TouchableOpacity style={[s.iconBtn, exporting && { opacity: 0.5 }]} onPress={handleExport} disabled={exporting}>
             <Icon name="file-download" size={18} color={theme.text} />
           </TouchableOpacity>
         </View>
@@ -352,6 +361,7 @@ export const LocationManagementScreen: React.FC<{ navigation: any }> = ({ naviga
         ) : null}
       />
 
+      <DownloadCompletionModal visible={modalState.visible} filename={modalState.filename} filepath={modalState.filepath} filesize={modalState.filesize} onClose={closeModal} />
       <FormModal key={editingLocation?.id ?? 'new'} visible={showForm} title={editingLocation ? 'Edit Location' : 'Add New Location'} onClose={resetForm}>
         <FormField label="Location Name" required value={formData.name} onChangeText={t => setFormData(p => ({ ...p, name: t }))} placeholder="e.g., Warehouse A, Showroom Floor 1" />
         <FormField label="Address (Optional)" value={formData.address} onChangeText={t => setFormData(p => ({ ...p, address: t }))} placeholder="Enter address" multiline numberOfLines={3} style={{ height: 80, textAlignVertical: 'top' }} />

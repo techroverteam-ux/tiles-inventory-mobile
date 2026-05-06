@@ -3,7 +3,7 @@ import { BottomTabParamList } from './types'
 import { EnhancedDashboardScreen } from '../screens/dashboard/EnhancedDashboardScreen'
 import { ProductsStack } from './stacks/ProductsStack'
 import { InventoryStack } from './stacks/InventoryStack'
-import { OrdersStack } from './stacks/OrdersStack'
+import { PurchaseOrdersStack, SalesOrdersStack } from './stacks/OrdersStack'
 
 export type MainTabRouteName = keyof BottomTabParamList
 
@@ -38,15 +38,13 @@ export const mainTabItems: MainTabItem[] = [
     routeName: 'PurchaseTab',
     label: 'Purchase',
     icon: 'shopping-cart',
-    component: OrdersStack,
-    initialParams: { orderType: 'purchase' },
+    component: PurchaseOrdersStack,
   },
   {
     routeName: 'SalesTab',
     label: 'Sales',
     icon: 'trending-up',
-    component: OrdersStack,
-    initialParams: { orderType: 'sales' },
+    component: SalesOrdersStack,
   },
 ]
 
